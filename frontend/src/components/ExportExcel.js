@@ -181,6 +181,7 @@ function ExportExcel() {
         'Jours': calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin),
         Semaine: item.numero_semaine,
         Année: item.annee,
+        Note: item.note || '',
       }));
 
       // Créer le workbook et la feuille
@@ -199,6 +200,7 @@ function ExportExcel() {
         { wch: 8 },  // Jours
         { wch: 10 }, // Semaine
         { wch: 8 },  // Année
+        { wch: 50 }, // Note
       ];
       ws['!cols'] = columnWidths;
 
@@ -331,6 +333,7 @@ function ExportExcel() {
                     <th>Début</th>
                     <th>Fin</th>
                     <th>Jours</th>
+                    <th>Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -358,6 +361,7 @@ function ExportExcel() {
                           {calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)}
                         </strong>
                       </td>
+                      <td>{item.note || <span className="text-muted">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -48,6 +48,22 @@ class DevelopmentConfig(Config):
     }
 
 
+class TestingConfig(Config):
+    """Testing configuration — uses in-memory SQLite, no external DB required."""
+
+    TESTING = True
+    DEBUG = False
+    SQLALCHEMY_ECHO = False
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    CORS_CONFIG = {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False,
+        "max_age": 3600,
+    }
+
+
 class ProductionConfig(Config):
     """Production configuration"""
 
@@ -58,5 +74,6 @@ class ProductionConfig(Config):
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
+    "testing": TestingConfig,
     "default": DevelopmentConfig,
 }

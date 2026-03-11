@@ -9,3 +9,4 @@ marshmallow-sqlalchemy==0.29.0
 PyMySQL==1.1.1
 python-dotenv==1.0.1
 cryptography==42.0.8
+gunicorn==22.0.0

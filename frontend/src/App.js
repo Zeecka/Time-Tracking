@@ -80,9 +80,6 @@ function App() {
                 <Nav.Link as={Link} to="/export">
                   Export Excel
                 </Nav.Link>
-                <Nav.Link as={Link} to="/stats">
-                  Stats
-                </Nav.Link>
               </Nav>
               <Nav>
                 <div className="d-flex align-items-center gap-2">
@@ -118,7 +115,8 @@ function App() {
 
         <Container className="mt-4">
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Stats />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/pointages" element={<Navigate to="/pointages/table" replace />} />
             <Route path="/pointages/table" element={<PointageGrid viewMode="table" />} />
             <Route path="/pointages/gantt" element={<PointageGrid viewMode="gantt" />} />
@@ -126,7 +124,6 @@ function App() {
             <Route path="/code-pointage" element={<CodePointageList />} />
             <Route path="/utilisateurs" element={<UtilisateurList />} />
             <Route path="/export" element={<ExportExcel />} />
-            <Route path="/stats" element={<Stats />} />
           </Routes>
         </Container>
       </div>

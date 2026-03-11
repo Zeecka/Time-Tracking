@@ -60,6 +60,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     container_name: pointage_frontend_dev
     restart: unless-stopped
     environment:
