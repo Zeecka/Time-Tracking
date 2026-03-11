@@ -1,5 +1,11 @@
 # Application de Pointage
 
+![Backend Flask](https://img.shields.io/badge/Backend-Flask-000000?logo=flask)
+![Frontend React](https://img.shields.io/badge/Frontend-React-20232A?logo=react)
+![Database MariaDB](https://img.shields.io/badge/Database-MariaDB-003545?logo=mariadb)
+![Docker Compose](https://img.shields.io/badge/Dev-Docker%20Compose-2496ED?logo=docker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Application web de gestion de pointage (time tracking) pour remplacer les tableaux croisés dynamiques Excel.
 
 ## Technologies
@@ -23,7 +29,9 @@ Les détails d'installation et de développement ont été déplacés dans la do
 
 - [Guide de développement](docs/README_DEV.md)
 
-Pour démarrer rapidement :
+### Développement
+
+Pour démarrer rapidement en mode développement :
 
 ```bash
 docker compose -f compose.dev.yml up --build --watch
@@ -33,6 +41,33 @@ Services disponibles :
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
 - **MariaDB**: localhost:3306
+
+### Production
+
+1. Préparer le fichier d'environnement :
+
+```bash
+cp .env.example .env
+```
+
+2. Mettre à jour les secrets/valeurs de production dans `.env` (au minimum `MYSQL_*` et `SECRET_KEY`).
+
+3. Démarrer la stack production :
+
+```bash
+docker compose -f compose.yml up -d --build
+```
+
+4. Accéder à l'application :
+
+- **Frontend (Nginx)**: http://localhost
+- **API via frontend**: http://localhost/api/v1
+
+Pour arrêter :
+
+```bash
+docker compose -f compose.yml down
+```
 
 Documentation technique (structure du projet + API REST) : [docs/README_DEV.md](docs/README_DEV.md).
 
@@ -94,4 +129,4 @@ Toute la documentation de développement (setup, seed, exécution locale, type-c
 
 ## Licence
 
-Projet privé - Tous droits réservés
+Distribué sous licence MIT. Voir [LICENSE](LICENSE).
