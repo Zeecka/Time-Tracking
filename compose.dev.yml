@@ -1,0 +1,97 @@
+services:
+  mariadb:
+    image: mariadb:11.2
+    container_name: pointage_db_dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mariadb_data_dev:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - pointage_network_dev
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pointage_backend_dev
+    restart: unless-stopped
+    environment:
+      FLASK_APP: app
+      FLASK_ENV: development
+      FLASK_DEBUG: "1"
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "5000:5000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - pointage_network_dev
+    command: sh -c "flask init-db --reset && flask seed-dev && flask run --host=0.0.0.0 --port=5000 --debug"
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - __pycache__/
+            - app/__pycache__/
+            - app/analyzers/__pycache__/
+            - app/routes/__pycache__/
+        - action: rebuild
+          path: ./backend/requirements.txt
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pointage_frontend_dev
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - pointage_network_dev
+    stdin_open: true
+    tty: true
+    command: npm start
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: sync
+          path: ./frontend/public
+          target: /app/public
+        - action: rebuild
+          path: ./frontend/package.json
+
+volumes:
+  mariadb_data_dev:
+
+networks:
+  pointage_network_dev:
+    driver: bridge

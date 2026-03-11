@@ -1,0 +1,316 @@
+.period-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #eef2ff 0%, #f1f5f9 100%);
+  border: 1px solid #dbe4ff;
+}
+
+.period-switch-option {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.period-switch-option.active {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: #f8fafc;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.25);
+}
+
+.period-switch-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.period-switch-option:not(:disabled):hover {
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+/* Sortable table headers */
+.table thead th[style*="cursor: pointer"] {
+  transition: background-color 0.2s ease;
+}
+
+.table thead th[style*="cursor: pointer"]:hover {
+  background-color: var(--bs-table-hover-bg, #e9ecef);
+}
+
+.table thead th[style*="cursor: pointer"]:active {
+  background-color: var(--bs-table-active-bg, #dee2e6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .table thead th[style*="cursor: pointer"]:hover {
+    background-color: rgba(255, 255, 255, 0.075);
+  }
+
+  .table thead th[style*="cursor: pointer"]:active {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+:root,
+[data-bs-theme="light"] {
+  --rs-bg: #ffffff;
+  --rs-border: #ced4da;
+  --rs-focus-border: #adb5bd;
+  --rs-focus-shadow: rgba(108, 117, 125, 0.25);
+  --rs-option-bg: #ffffff;
+  --rs-option-hover: #f1f3f5;
+  --rs-option-selected: #e9ecef;
+  --rs-text: #212529;
+  --rs-placeholder: #6c757d;
+  --rs-menu-bg: #ffffff;
+  --rs-menu-border: #ced4da;
+  --rs-indicator: #6c757d;
+  --rs-separator: #dee2e6;
+  --gantt-user-pair-alt-bg: #edf1f5;
+}
+
+[data-bs-theme="dark"] {
+  --rs-bg: var(--bs-body-bg);
+  --rs-border: var(--bs-border-color);
+  --rs-focus-border: var(--bs-secondary-color);
+  --rs-focus-shadow: rgba(173, 181, 189, 0.25);
+  --rs-option-bg: var(--bs-body-bg);
+  --rs-option-hover: var(--bs-tertiary-bg);
+  --rs-option-selected: var(--bs-secondary-bg);
+  --rs-text: var(--bs-body-color);
+  --rs-placeholder: var(--bs-secondary-color);
+  --rs-menu-bg: var(--bs-body-bg);
+  --rs-menu-border: var(--bs-border-color);
+  --rs-indicator: var(--bs-secondary-color);
+  --rs-separator: var(--bs-border-color);
+  --gantt-user-pair-alt-bg: rgba(0, 0, 0, 0.18);
+}
+
+.rs-select .rs__control {
+  border-color: var(--rs-border);
+  color: var(--rs-text);
+}
+
+.rs-select .rs__control--is-focused {
+  border-color: var(--rs-focus-border);
+  box-shadow: 0 0 0 0.25rem var(--rs-focus-shadow);
+}
+
+.rs-select .rs__single-value {
+  color: var(--rs-text);
+}
+
+.rs-select .rs__placeholder {
+  color: var(--rs-placeholder);
+}
+
+.rs-select .rs__menu {
+  background-color: var(--rs-menu-bg);
+  border: 1px solid var(--rs-menu-border);
+}
+
+.rs-select .rs__option {
+  background-color: var(--rs-option-bg);
+  color: var(--rs-text);
+}
+
+.rs-select .rs__option--is-focused {
+  background-color: var(--rs-option-hover);
+}
+
+.rs-select .rs__option--is-selected {
+  background-color: var(--rs-option-selected);
+}
+
+.rs-select .rs__indicator-separator {
+  background-color: var(--rs-separator);
+}
+
+.rs-select .rs__dropdown-indicator,
+.rs-select .rs__clear-indicator {
+  color: var(--rs-indicator);
+}
+
+/* Button styling with smooth transitions */
+.btn {
+  transition: all 0.2s ease;
+}
+
+/* Button icons styling */
+.btn-outline-warning i,
+.btn-outline-danger i {
+  color: currentColor;
+}
+
+/* Table vertical alignment */
+.pointage-table tbody td,
+.utilisateur-table tbody td,
+.projet-table tbody td,
+.code-pointage-table tbody td {
+  vertical-align: middle;
+}
+
+/* Pointage Table Styling */
+.pointage-table {
+  margin-bottom: 1rem;
+}
+
+.pointage-table thead th {
+  vertical-align: middle;
+  padding: 0.75rem;
+  font-weight: 600;
+}
+
+.pointage-table tbody td {
+  vertical-align: middle;
+  padding: 0.25rem 0.75rem;
+}
+
+.pointage-table tbody tr {
+  height: auto;
+}
+
+/* Gantt view */
+.gantt-view {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background-color: var(--bs-body-bg);
+  overflow: hidden;
+}
+
+.gantt-header,
+.gantt-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+}
+
+.gantt-header {
+  background-color: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.gantt-resource-head {
+  padding: 0.6rem 0.8rem;
+  font-weight: 600;
+  border-right: 1px solid var(--bs-border-color);
+}
+
+.gantt-timeline-head {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.gantt-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.25rem;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  border-left: 1px solid var(--bs-border-color);
+}
+
+.gantt-day-head small {
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+}
+
+.gantt-row {
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.gantt-row-user-separator {
+  border-top: 3px solid var(--bs-border-color);
+}
+
+.gantt-row-user-pair-alt {
+  background-color: var(--gantt-user-pair-alt-bg);
+}
+
+.gantt-row:last-child {
+  border-bottom: none;
+}
+
+.gantt-resource-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.8rem;
+  border-right: 1px solid var(--bs-border-color);
+  min-width: 0;
+  height: 30px;
+}
+
+.gantt-user-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--bs-border-color);
+  flex-shrink: 0;
+}
+
+.gantt-user-name,
+.gantt-project-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+}
+
+.gantt-user-name {
+  font-weight: 600;
+}
+
+.gantt-project-name {
+  color: var(--bs-secondary-color);
+}
+
+.gantt-timeline-cell {
+  position: relative;
+  height: 30px;
+}
+
+.gantt-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  height: 100%;
+}
+
+.gantt-slot {
+  border-left: 1px solid var(--bs-border-color);
+}
+
+.gantt-slot-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.gantt-slot-clickable:hover {
+  background-color: rgba(13, 110, 253, 0.15);
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+
+  height: 15px;
+  border-radius: 999px;
+  opacity: 0.9;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.gantt-empty {
+  padding: 0.9rem;
+  text-align: center;
+  color: var(--bs-secondary-color);
+}
+
