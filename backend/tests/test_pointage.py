@@ -13,7 +13,6 @@ Covers:
 
 import io
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -49,7 +48,9 @@ def put_pointage(client, pointage_id, payload):
 
 class TestPointageCsvImportExport:
     def test_export_pointage_csv(self, client, utilisateur_alice, projet_dev):
-        rv_create = post_pointage(client, make_payload(utilisateur_alice.id, projet_dev.id))
+        rv_create = post_pointage(
+            client, make_payload(utilisateur_alice.id, projet_dev.id)
+        )
         assert rv_create.status_code == 201
 
         rv = client.get(f"{BASE}/export-csv")

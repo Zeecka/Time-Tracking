@@ -645,11 +645,11 @@ def bulk_create_pointages():
         return jsonify({"error": str(e)}), 500
 
 
-@pointage_bp.route('/export-csv', methods=['GET'])
+@pointage_bp.route("/export-csv", methods=["GET"])
 def export_pointages_csv():
     """Export all pointages (or filtered by week/year) as CSV."""
-    numero_semaine = request.args.get('numero_semaine', type=int)
-    annee = request.args.get('annee', type=int)
+    numero_semaine = request.args.get("numero_semaine", type=int)
+    annee = request.args.get("annee", type=int)
 
     query = Pointage.query
     if numero_semaine:
@@ -667,15 +667,15 @@ def export_pointages_csv():
     writer = csv.writer(output)
     writer.writerow(
         [
-            'date_debut',
-            'periode_debut',
-            'date_fin',
-            'periode_fin',
-            'numero_semaine',
-            'annee',
-            'utilisateur',
-            'projet',
-            'note',
+            "date_debut",
+            "periode_debut",
+            "date_fin",
+            "periode_fin",
+            "numero_semaine",
+            "annee",
+            "utilisateur",
+            "projet",
+            "note",
         ]
     )
 
@@ -688,9 +688,9 @@ def export_pointages_csv():
                 pointage.periode_fin,
                 pointage.numero_semaine,
                 pointage.annee,
-                pointage.utilisateur.nom if pointage.utilisateur else '',
-                pointage.projet.nom if pointage.projet else '',
-                pointage.note or '',
+                pointage.utilisateur.nom if pointage.utilisateur else "",
+                pointage.projet.nom if pointage.projet else "",
+                pointage.note or "",
             ]
         )
 
@@ -699,42 +699,44 @@ def export_pointages_csv():
 
     return Response(
         csv_content,
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=pointages.csv'},
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=pointages.csv"},
     )
 
 
-@pointage_bp.route('/import-csv', methods=['POST'])
+@pointage_bp.route("/import-csv", methods=["POST"])
 def import_pointages_csv():
     """Import pointages from CSV file."""
     try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'CSV file is required in form field "file"'}), 400
+        if "file" not in request.files:
+            return jsonify({"error": 'CSV file is required in form field "file"'}), 400
 
-        csv_file = request.files['file']
+        csv_file = request.files["file"]
         if not csv_file or not csv_file.filename:
-            return jsonify({'error': 'CSV file is required'}), 400
+            return jsonify({"error": "CSV file is required"}), 400
 
-        content = csv_file.stream.read().decode('utf-8-sig')
+        content = csv_file.stream.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
 
         required_headers = {
-            'date_debut',
-            'periode_debut',
-            'date_fin',
-            'periode_fin',
-            'numero_semaine',
-            'annee',
-            'utilisateur',
-            'projet',
+            "date_debut",
+            "periode_debut",
+            "date_fin",
+            "periode_fin",
+            "numero_semaine",
+            "annee",
+            "utilisateur",
+            "projet",
         }
-        if not reader.fieldnames or not required_headers.issubset(set(reader.fieldnames)):
+        if not reader.fieldnames or not required_headers.issubset(
+            set(reader.fieldnames)
+        ):
             return jsonify(
                 {
-                    'error': (
-                        'CSV header must contain: '
-                        'date_debut,periode_debut,date_fin,periode_fin,numero_semaine,annee,utilisateur,projet '
-                        '(note optional)'
+                    "error": (
+                        "CSV header must contain: "
+                        "date_debut,periode_debut,date_fin,periode_fin,numero_semaine,annee,utilisateur,projet "
+                        "(note optional)"
                     )
                 }
             ), 400
@@ -745,34 +747,36 @@ def import_pointages_csv():
         for idx, row in enumerate(reader, start=2):
             with db.session.begin_nested():
                 try:
-                    utilisateur_nom = str(row.get('utilisateur', '')).strip()
-                    projet_nom = str(row.get('projet', '')).strip()
+                    utilisateur_nom = str(row.get("utilisateur", "")).strip()
+                    projet_nom = str(row.get("projet", "")).strip()
 
                     if not utilisateur_nom or not projet_nom:
-                        raise ValueError('utilisateur and projet are required')
+                        raise ValueError("utilisateur and projet are required")
 
-                    utilisateur = Utilisateur.query.filter_by(nom=utilisateur_nom).first()
+                    utilisateur = Utilisateur.query.filter_by(
+                        nom=utilisateur_nom
+                    ).first()
                     if not utilisateur:
-                        raise ValueError(f'User not found: {utilisateur_nom}')
+                        raise ValueError(f"User not found: {utilisateur_nom}")
 
                     projet = Projet.query.filter_by(nom=projet_nom).first()
                     if not projet:
-                        raise ValueError(f'Project not found: {projet_nom}')
+                        raise ValueError(f"Project not found: {projet_nom}")
 
-                    numero_semaine = int(str(row.get('numero_semaine', '')).strip())
-                    annee = int(str(row.get('annee', '')).strip())
+                    numero_semaine = int(str(row.get("numero_semaine", "")).strip())
+                    annee = int(str(row.get("annee", "")).strip())
                     if not 1 <= numero_semaine <= 53:
-                        raise ValueError('Week number must be between 1 and 53')
+                        raise ValueError("Week number must be between 1 and 53")
                     if annee < 2000 or annee > 2100:
-                        raise ValueError('Year must be between 2000 and 2100')
+                        raise ValueError("Year must be between 2000 and 2100")
 
-                    date_debut = _parse_iso_date(row.get('date_debut'), 'date_debut')
-                    date_fin = _parse_iso_date(row.get('date_fin'), 'date_fin')
+                    date_debut = _parse_iso_date(row.get("date_debut"), "date_debut")
+                    date_fin = _parse_iso_date(row.get("date_fin"), "date_fin")
                     periode_debut = _normalize_and_validate_periode(
-                        row.get('periode_debut'), 'periode_debut', True
+                        row.get("periode_debut"), "periode_debut", True
                     )
                     periode_fin = _normalize_and_validate_periode(
-                        row.get('periode_fin'), 'periode_fin', False
+                        row.get("periode_fin"), "periode_fin", False
                     )
 
                     _validate_pointage_dates_and_periodes(
@@ -807,7 +811,7 @@ def import_pointages_csv():
                         annee=annee,
                         utilisateur_id=utilisateur.id,
                         projet_id=projet.id,
-                        note=str(row.get('note', '')).strip() or None,
+                        note=str(row.get("note", "")).strip() or None,
                     )
                     db.session.add(pointage)
                     db.session.flush()
@@ -823,7 +827,7 @@ def import_pointages_csv():
                     created_pointages.append(pointage)
 
                 except Exception as row_error:
-                    errors.append({'line': idx, 'error': str(row_error)})
+                    errors.append({"line": idx, "error": str(row_error)})
 
         if created_pointages:
             db.session.commit()
@@ -831,12 +835,12 @@ def import_pointages_csv():
         status = 201 if created_pointages else 200
         return jsonify(
             {
-                'created': len(created_pointages),
-                'errors': errors,
-                'pointages': pointages_schema.dump(created_pointages),
+                "created": len(created_pointages),
+                "errors": errors,
+                "pointages": pointages_schema.dump(created_pointages),
             }
         ), status
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500

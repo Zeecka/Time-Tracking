@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import CodePointage, Projet
 from app.schemas import projet_schema, projets_schema
+
 projet_bp = Blueprint("projet", __name__)
 ALLOWED_MOTIFS = {"uni", "raye", "pointille"}
 
@@ -148,14 +149,14 @@ def delete_projet(id):
         return jsonify({"error": str(e)}), 500
 
 
-@projet_bp.route('/export-csv', methods=['GET'])
+@projet_bp.route("/export-csv", methods=["GET"])
 def export_projets_csv():
     """Export all projects as CSV."""
     projets = Projet.query.order_by(Projet.nom).all()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['nom', 'couleur', 'motif', 'code_pointage'])
+    writer.writerow(["nom", "couleur", "motif", "code_pointage"])
 
     for projet in projets:
         writer.writerow(
@@ -163,7 +164,7 @@ def export_projets_csv():
                 projet.nom,
                 projet.couleur,
                 projet.motif,
-                projet.code_pointage.code if projet.code_pointage else '',
+                projet.code_pointage.code if projet.code_pointage else "",
             ]
         )
 
@@ -172,29 +173,33 @@ def export_projets_csv():
 
     return Response(
         csv_content,
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=projets.csv'},
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=projets.csv"},
     )
 
 
-@projet_bp.route('/import-csv', methods=['POST'])
+@projet_bp.route("/import-csv", methods=["POST"])
 def import_projets_csv():
     """Import projects from CSV file."""
     try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'CSV file is required in form field "file"'}), 400
+        if "file" not in request.files:
+            return jsonify({"error": 'CSV file is required in form field "file"'}), 400
 
-        csv_file = request.files['file']
+        csv_file = request.files["file"]
         if not csv_file or not csv_file.filename:
-            return jsonify({'error': 'CSV file is required'}), 400
+            return jsonify({"error": "CSV file is required"}), 400
 
-        content = csv_file.stream.read().decode('utf-8-sig')
+        content = csv_file.stream.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
 
-        required_headers = {'nom', 'code_pointage'}
-        if not reader.fieldnames or not required_headers.issubset(set(reader.fieldnames)):
+        required_headers = {"nom", "code_pointage"}
+        if not reader.fieldnames or not required_headers.issubset(
+            set(reader.fieldnames)
+        ):
             return jsonify(
-                {'error': 'CSV header must contain: nom,code_pointage (couleur,motif optional)'}
+                {
+                    "error": "CSV header must contain: nom,code_pointage (couleur,motif optional)"
+                }
             ), 400
 
         created = 0
@@ -202,24 +207,28 @@ def import_projets_csv():
         errors = []
 
         for idx, row in enumerate(reader, start=2):
-            nom = str(row.get('nom', '')).strip()
-            code_value = str(row.get('code_pointage', '')).strip()
-            couleur = str(row.get('couleur', '')).strip() or '#3498db'
-            motif_value = row.get('motif', 'uni')
+            nom = str(row.get("nom", "")).strip()
+            code_value = str(row.get("code_pointage", "")).strip()
+            couleur = str(row.get("couleur", "")).strip() or "#3498db"
+            motif_value = row.get("motif", "uni")
 
             if not nom or not code_value:
-                errors.append({'line': idx, 'error': 'nom and code_pointage are required'})
+                errors.append(
+                    {"line": idx, "error": "nom and code_pointage are required"}
+                )
                 continue
 
             code = CodePointage.query.filter_by(code=code_value).first()
             if not code:
-                errors.append({'line': idx, 'error': f'code_pointage not found: {code_value}'})
+                errors.append(
+                    {"line": idx, "error": f"code_pointage not found: {code_value}"}
+                )
                 continue
 
             try:
                 motif = _normalize_and_validate_motif(motif_value)
             except ValueError as e:
-                errors.append({'line': idx, 'error': str(e)})
+                errors.append({"line": idx, "error": str(e)})
                 continue
 
             projet = Projet.query.filter_by(nom=nom).first()
@@ -242,8 +251,10 @@ def import_projets_csv():
         db.session.commit()
 
         status = 201 if created > 0 else 200
-        return jsonify({'created': created, 'updated': updated, 'errors': errors}), status
+        return jsonify(
+            {"created": created, "updated": updated, "errors": errors}
+        ), status
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500

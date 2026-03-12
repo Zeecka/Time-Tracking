@@ -282,7 +282,9 @@ class TestCsvImportExport:
         assert data["created"] == 1
 
     def test_import_projet_csv(self, client, code_dev):
-        csv_content = "nom,couleur,motif,code_pointage\nOnboarding,#abcdef,pointille,DEV\n"
+        csv_content = (
+            "nom,couleur,motif,code_pointage\nOnboarding,#abcdef,pointille,DEV\n"
+        )
         rv = client.post(
             f"{BASE_PROJ}/import-csv",
             data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.csv")},
