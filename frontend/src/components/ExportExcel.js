@@ -24,17 +24,6 @@ const getIsoWeeksInYear = (year) => {
   return Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
 };
 
-const sanitizeWeekYear = (year, week) => {
-  const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
-  const parsedYear = Number.isFinite(Number(year)) ? parseInt(year, 10) : CURRENT_WEEK_INFO.year;
-  const safeYear = Math.min(2100, Math.max(2000, parsedYear));
-  const maxWeeks = getIsoWeeksInYear(safeYear);
-  const parsedWeek = Number.isFinite(Number(week)) ? parseInt(week, 10) : CURRENT_WEEK_INFO.week;
-  const safeWeek = Math.min(maxWeeks, Math.max(1, parsedWeek));
-
-  return { annee: safeYear, numero_semaine: safeWeek };
-};
-
 const getIsoWeekDateRange = (year, week) => {
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const jan4Day = jan4.getUTCDay() || 7;
@@ -102,13 +91,226 @@ const PERIODE_LABELS = {
   apres_midi: 'Après-midi',
 };
 
+const EXPORT_COLUMNS = [
+  {
+    id: 'annee',
+    label: 'Année',
+    width: 8,
+    getValue: (item) => item.annee,
+  },
+  {
+    id: 'semaine',
+    label: 'Semaine',
+    width: 10,
+    getValue: (item) => item.numero_semaine,
+  },
+  {
+    id: 'utilisateur',
+    label: 'Utilisateur',
+    width: 20,
+    getValue: (item) => item.utilisateur?.nom || 'N/A',
+  },
+  {
+    id: 'projet',
+    label: 'Projet',
+    width: 30,
+    getValue: (item) => item.projet?.nom || 'N/A',
+  },
+  {
+    id: 'code_pointage',
+    label: 'Code Pointage',
+    width: 15,
+    getValue: (item) => item.projet?.code_pointage?.code || 'N/A',
+  },
+  {
+    id: 'date_debut',
+    label: 'Date Début',
+    width: 12,
+    getValue: (item) => formatDateDDMMYYYY(item.date_debut),
+  },
+  {
+    id: 'periode_debut',
+    label: 'Période Début',
+    width: 15,
+    getValue: (item) => PERIODE_LABELS[item.periode_debut] || item.periode_debut,
+  },
+  {
+    id: 'date_fin',
+    label: 'Date Fin',
+    width: 12,
+    getValue: (item) => formatDateDDMMYYYY(item.date_fin),
+  },
+  {
+    id: 'periode_fin',
+    label: 'Période Fin',
+    width: 15,
+    getValue: (item) => PERIODE_LABELS[item.periode_fin] || item.periode_fin,
+  },
+  {
+    id: 'jours',
+    label: 'Jours',
+    width: 8,
+    getValue: (item) => calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin),
+  },
+  {
+    id: 'note',
+    label: 'Note',
+    width: 50,
+    getValue: (item) => item.note || '',
+  },
+];
+
+const getDefaultSelectedColumns = () => EXPORT_COLUMNS.reduce((acc, column) => ({
+  ...acc,
+  [column.id]: true,
+}), {});
+
+const getActiveColumns = (selectedColumns) => EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]);
+
+const compareWeekYear = (left, right) => {
+  if (left.annee !== right.annee) {
+    return left.annee - right.annee;
+  }
+  return left.numero_semaine - right.numero_semaine;
+};
+
+const incrementWeekYear = ({ annee, numero_semaine }) => {
+  const maxWeeks = getIsoWeeksInYear(annee);
+  if (numero_semaine < maxWeeks) {
+    return { annee, numero_semaine: numero_semaine + 1 };
+  }
+  return { annee: annee + 1, numero_semaine: 1 };
+};
+
+const buildWeekRange = (start, end) => {
+  const weeks = [];
+  let current = { ...start };
+
+  while (compareWeekYear(current, end) <= 0) {
+    weeks.push(current);
+    current = incrementWeekYear(current);
+  }
+
+  return weeks;
+};
+
+const sanitizeRangeFilters = (inputFilters) => {
+  const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
+
+  const parsedStartYear = Number.isFinite(Number(inputFilters.start_annee))
+    ? parseInt(inputFilters.start_annee, 10)
+    : CURRENT_WEEK_INFO.year;
+  const start_annee = Math.min(2100, Math.max(2000, parsedStartYear));
+
+  const parsedEndYear = Number.isFinite(Number(inputFilters.end_annee))
+    ? parseInt(inputFilters.end_annee, 10)
+    : CURRENT_WEEK_INFO.year;
+  const end_annee = Math.min(2100, Math.max(2000, parsedEndYear));
+
+  const startMaxWeeks = getIsoWeeksInYear(start_annee);
+  const endMaxWeeks = getIsoWeeksInYear(end_annee);
+
+  const parsedStartWeek = Number.isFinite(Number(inputFilters.start_numero_semaine))
+    ? parseInt(inputFilters.start_numero_semaine, 10)
+    : CURRENT_WEEK_INFO.week;
+  const start_numero_semaine = Math.min(startMaxWeeks, Math.max(1, parsedStartWeek));
+
+  const parsedEndWeek = Number.isFinite(Number(inputFilters.end_numero_semaine))
+    ? parseInt(inputFilters.end_numero_semaine, 10)
+    : CURRENT_WEEK_INFO.week;
+  const end_numero_semaine = Math.min(endMaxWeeks, Math.max(1, parsedEndWeek));
+
+  const start = { annee: start_annee, numero_semaine: start_numero_semaine };
+  const end = { annee: end_annee, numero_semaine: end_numero_semaine };
+
+  if (compareWeekYear(start, end) <= 0) {
+    return {
+      start_annee,
+      start_numero_semaine,
+      end_annee,
+      end_numero_semaine,
+    };
+  }
+
+  return {
+    start_annee: end_annee,
+    start_numero_semaine: end_numero_semaine,
+    end_annee: start_annee,
+    end_numero_semaine: start_numero_semaine,
+  };
+};
+
+const formatWeekYearLabel = ({ annee, numero_semaine }) => `S${numero_semaine}-${annee}`;
+
+const buildStatsRows = (pointages, rangeLabel) => {
+  const totalJours = pointages.reduce((sum, item) => (
+    sum + calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)
+  ), 0);
+
+  const utilisateursMap = {};
+  const projetsMap = {};
+
+  pointages.forEach((item) => {
+    const jours = calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin);
+
+    const utilisateurNom = item.utilisateur?.nom || 'N/A';
+    if (!utilisateursMap[utilisateurNom]) {
+      utilisateursMap[utilisateurNom] = { jours: 0, pointages: 0 };
+    }
+    utilisateursMap[utilisateurNom].jours += jours;
+    utilisateursMap[utilisateurNom].pointages += 1;
+
+    const projetNom = item.projet?.nom || 'N/A';
+    const codePointage = item.projet?.code_pointage?.code || 'N/A';
+    const projetKey = `${projetNom}__${codePointage}`;
+    if (!projetsMap[projetKey]) {
+      projetsMap[projetKey] = {
+        nom: projetNom,
+        code: codePointage,
+        jours: 0,
+        pointages: 0,
+      };
+    }
+    projetsMap[projetKey].jours += jours;
+    projetsMap[projetKey].pointages += 1;
+  });
+
+  const utilisateursRows = Object.entries(utilisateursMap)
+    .map(([nom, values]) => [nom, Number(values.jours.toFixed(2)), values.pointages])
+    .sort((left, right) => right[1] - left[1]);
+
+  const projetsRows = Object.values(projetsMap)
+    .map((projet) => [projet.nom, projet.code, Number(projet.jours.toFixed(2)), projet.pointages])
+    .sort((left, right) => right[2] - left[2]);
+
+  return [
+    ['Synthèse export'],
+    ['Période', rangeLabel],
+    ['Pointages exportés', pointages.length],
+    ['Total jours', Number(totalJours.toFixed(2))],
+    ['Utilisateurs uniques', Object.keys(utilisateursMap).length],
+    ['Projets uniques', Object.keys(projetsMap).length],
+    [],
+    ['Répartition par utilisateur'],
+    ['Utilisateur', 'Jours', 'Pointages'],
+    ...utilisateursRows,
+    [],
+    ['Répartition par projet'],
+    ['Projet', 'Code Pointage', 'Jours', 'Pointages'],
+    ...projetsRows,
+  ];
+};
+
 function ExportExcel() {
   const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
   const [filters, setFilters] = useState({
-    annee: CURRENT_WEEK_INFO.year,
-    numero_semaine: CURRENT_WEEK_INFO.week,
+    start_annee: CURRENT_WEEK_INFO.year,
+    start_numero_semaine: CURRENT_WEEK_INFO.week,
+    end_annee: CURRENT_WEEK_INFO.year,
+    end_numero_semaine: CURRENT_WEEK_INFO.week,
   });
   const [pointages, setPointages] = useState([]);
+  const [selectedColumns, setSelectedColumns] = useState(getDefaultSelectedColumns);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -116,8 +318,39 @@ function ExportExcel() {
   const loadPointages = useCallback(async (filterParams) => {
     try {
       setLoading(true);
-      const response = await pointageAPI.getAll(filterParams);
-      setPointages(response.data);
+      const start = {
+        annee: filterParams.start_annee,
+        numero_semaine: filterParams.start_numero_semaine,
+      };
+      const end = {
+        annee: filterParams.end_annee,
+        numero_semaine: filterParams.end_numero_semaine,
+      };
+
+      const weeksToLoad = buildWeekRange(start, end);
+      const responses = await Promise.all(
+        weeksToLoad.map((week) => pointageAPI.getAll({
+          annee: week.annee,
+          numero_semaine: week.numero_semaine,
+        })),
+      );
+
+      const merged = responses.flatMap((response) => response.data || []);
+      const uniquePointagesMap = new Map();
+      merged.forEach((item) => {
+        uniquePointagesMap.set(item.id, item);
+      });
+
+      const sortedPointages = Array.from(uniquePointagesMap.values()).sort((left, right) => {
+        if (left.annee !== right.annee) return left.annee - right.annee;
+        if (left.numero_semaine !== right.numero_semaine) return left.numero_semaine - right.numero_semaine;
+        if (left.utilisateur?.nom !== right.utilisateur?.nom) {
+          return (left.utilisateur?.nom || '').localeCompare(right.utilisateur?.nom || '');
+        }
+        return left.id - right.id;
+      });
+
+      setPointages(sortedPointages);
       setError('');
     } catch (err) {
       setError('Erreur lors du chargement des pointages');
@@ -134,30 +367,14 @@ function ExportExcel() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     const nextFilters = { ...filters, [name]: value };
-    setFilters(sanitizeWeekYear(nextFilters.annee, nextFilters.numero_semaine));
+    setFilters(sanitizeRangeFilters(nextFilters));
   };
 
-  const handleWeekShift = (direction) => {
-    setFilters((prev) => {
-      const maxWeeks = getIsoWeeksInYear(prev.annee);
-
-      if (direction < 0) {
-        if (prev.numero_semaine > 1) {
-          return { ...prev, numero_semaine: prev.numero_semaine - 1 };
-        }
-        const previousYear = prev.annee - 1;
-        const safeYear = Math.max(2000, previousYear);
-        return { annee: safeYear, numero_semaine: getIsoWeeksInYear(safeYear) };
-      }
-
-      if (prev.numero_semaine < maxWeeks) {
-        return { ...prev, numero_semaine: prev.numero_semaine + 1 };
-      }
-
-      const nextYear = prev.annee + 1;
-      const safeYear = Math.min(2100, nextYear);
-      return { annee: safeYear, numero_semaine: 1 };
-    });
+  const handleToggleColumn = (columnId) => {
+    setSelectedColumns((prev) => ({
+      ...prev,
+      [columnId]: !prev[columnId],
+    }));
   };
 
   const handleExportExcel = () => {
@@ -166,50 +383,48 @@ function ExportExcel() {
       return;
     }
 
+    const activeColumns = getActiveColumns(selectedColumns);
+    if (activeColumns.length === 0) {
+      setError('Sélectionnez au moins une colonne à exporter');
+      return;
+    }
+
     try {
       setExporting(true);
 
       // Préparer les données pour Excel
-      const excelData = pointages.map((item) => ({
-        Utilisateur: item.utilisateur?.nom || 'N/A',
-        Projet: item.projet?.nom || 'N/A',
-        'Code Pointage': item.projet?.code_pointage?.code || 'N/A',
-        'Date Début': formatDateDDMMYYYY(item.date_debut),
-        'Période Début': PERIODE_LABELS[item.periode_debut] || item.periode_debut,
-        'Date Fin': formatDateDDMMYYYY(item.date_fin),
-        'Période Fin': PERIODE_LABELS[item.periode_fin] || item.periode_fin,
-        'Jours': calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin),
-        Semaine: item.numero_semaine,
-        Année: item.annee,
-        Note: item.note || '',
-      }));
+      const excelData = pointages.map((item) => {
+        const row = {};
+        activeColumns.forEach((column) => {
+          row[column.label] = column.getValue(item);
+        });
+        return row;
+      });
 
       // Créer le workbook et la feuille
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
+      const pointagesSheet = XLSX.utils.json_to_sheet(excelData);
 
       // Ajuster la largeur des colonnes
-      const columnWidths = [
-        { wch: 20 }, // Utilisateur
-        { wch: 30 }, // Projet
-        { wch: 15 }, // Code Pointage
-        { wch: 12 }, // Date Début
-        { wch: 15 }, // Période Début
-        { wch: 12 }, // Date Fin
-        { wch: 15 }, // Période Fin
-        { wch: 8 },  // Jours
-        { wch: 10 }, // Semaine
-        { wch: 8 },  // Année
-        { wch: 50 }, // Note
-      ];
-      ws['!cols'] = columnWidths;
+      pointagesSheet['!cols'] = activeColumns.map((column) => ({ wch: column.width }));
 
-      // Ajouter la feuille au workbook
-      const sheetName = `S${filters.numero_semaine}_${filters.annee}`;
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      // Ajouter la feuille de pointages au workbook
+      XLSX.utils.book_append_sheet(wb, pointagesSheet, 'Pointages');
+
+      const statsRangeLabel = `${formatWeekYearLabel({
+        annee: filters.start_annee,
+        numero_semaine: filters.start_numero_semaine,
+      })} à ${formatWeekYearLabel({
+        annee: filters.end_annee,
+        numero_semaine: filters.end_numero_semaine,
+      })}`;
+      const statsRows = buildStatsRows(pointages, statsRangeLabel);
+      const statsSheet = XLSX.utils.aoa_to_sheet(statsRows);
+      statsSheet['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, statsSheet, 'Stats');
 
       // Générer et télécharger le fichier
-      const fileName = `pointages_semaine_${filters.numero_semaine}_${filters.annee}.xlsx`;
+      const fileName = `pointages_${filters.start_annee}_S${filters.start_numero_semaine}_a_${filters.end_annee}_S${filters.end_numero_semaine}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
       setError('');
@@ -221,13 +436,16 @@ function ExportExcel() {
     }
   };
 
-  const weekRange = getIsoWeekDateRange(filters.annee, filters.numero_semaine);
+  const startWeekRange = getIsoWeekDateRange(filters.start_annee, filters.start_numero_semaine);
+  const endWeekRange = getIsoWeekDateRange(filters.end_annee, filters.end_numero_semaine);
   const formatFrenchShortDate = (date) => new Intl.DateTimeFormat('fr-FR', {
     day: 'numeric',
     month: 'long',
     timeZone: 'UTC',
   }).format(date);
-  const selectedWeekLabel = `Lundi ${formatFrenchShortDate(weekRange.monday)} - Vendredi ${formatFrenchShortDate(weekRange.friday)}`;
+  const selectedWeekLabel = `Du lundi ${formatFrenchShortDate(startWeekRange.monday)} ${filters.start_annee} au vendredi ${formatFrenchShortDate(endWeekRange.friday)} ${filters.end_annee}`;
+  const selectedColumnCount = EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]).length;
+  const previewColumns = getActiveColumns(selectedColumns);
 
   return (
     <div>
@@ -248,11 +466,11 @@ function ExportExcel() {
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Année</Form.Label>
+                <Form.Label>Année début</Form.Label>
                 <Form.Control
                   type="number"
-                  name="annee"
-                  value={Number.isFinite(filters.annee) ? filters.annee : ''}
+                  name="start_annee"
+                  value={Number.isFinite(filters.start_annee) ? filters.start_annee : ''}
                   onChange={handleFilterChange}
                   min="2000"
                   max="2100"
@@ -261,36 +479,42 @@ function ExportExcel() {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Semaine</Form.Label>
+                <Form.Label>Semaine début</Form.Label>
                 <Form.Control
                   type="number"
-                  name="numero_semaine"
-                  value={Number.isFinite(filters.numero_semaine) ? filters.numero_semaine : ''}
+                  name="start_numero_semaine"
+                  value={Number.isFinite(filters.start_numero_semaine) ? filters.start_numero_semaine : ''}
                   onChange={handleFilterChange}
                   min="1"
                   max="53"
                 />
               </Form.Group>
             </Col>
-            <Col md={3} className="d-flex align-items-end gap-2">
-              <Button
-                variant="outline-secondary"
-                onClick={() => handleWeekShift(-1)}
-                aria-label="Semaine précédente"
-                className="d-flex align-items-center justify-content-center"
-                style={{ width: '40px', height: '38px' }}
-              >
-                <i className="fas fa-chevron-left"></i>
-              </Button>
-              <Button
-                variant="outline-secondary"
-                onClick={() => handleWeekShift(1)}
-                aria-label="Semaine suivante"
-                className="d-flex align-items-center justify-content-center"
-                style={{ width: '40px', height: '38px' }}
-              >
-                <i className="fas fa-chevron-right"></i>
-              </Button>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Année fin</Form.Label>
+                <Form.Control
+                  type="number"
+                  name="end_annee"
+                  value={Number.isFinite(filters.end_annee) ? filters.end_annee : ''}
+                  onChange={handleFilterChange}
+                  min="2000"
+                  max="2100"
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Semaine fin</Form.Label>
+                <Form.Control
+                  type="number"
+                  name="end_numero_semaine"
+                  value={Number.isFinite(filters.end_numero_semaine) ? filters.end_numero_semaine : ''}
+                  onChange={handleFilterChange}
+                  min="1"
+                  max="53"
+                />
+              </Form.Group>
             </Col>
           </Row>
           <Row className="mb-3">
@@ -298,6 +522,30 @@ function ExportExcel() {
               <div className="text-muted">{selectedWeekLabel}</div>
             </Col>
           </Row>
+        </Card.Body>
+      </Card>
+
+      <Card className="mb-4">
+        <Card.Header>
+          <h5 className="mb-0">Colonnes à exporter</h5>
+        </Card.Header>
+        <Card.Body>
+          <Row>
+            {EXPORT_COLUMNS.map((column) => (
+              <Col key={column.id} md={4} className="mb-2">
+                <Form.Check
+                  type="checkbox"
+                  id={`export-col-${column.id}`}
+                  label={column.label}
+                  checked={!!selectedColumns[column.id]}
+                  onChange={() => handleToggleColumn(column.id)}
+                />
+              </Col>
+            ))}
+          </Row>
+          <div className="text-muted mt-2">
+            {selectedColumnCount} colonne(s) sélectionnée(s)
+          </div>
         </Card.Body>
       </Card>
 
@@ -317,50 +565,39 @@ function ExportExcel() {
           {loading ? (
             <p>Chargement...</p>
           ) : pointages.length === 0 ? (
-            <Alert variant="info">Aucun pointage trouvé pour cette période</Alert>
+            <Alert variant="info">Aucun pointage trouvé pour la période sélectionnée</Alert>
           ) : (
             <>
               <p className="mb-3">
-                <strong>{pointages.length}</strong> pointage(s) trouvé(s) pour la semaine {filters.numero_semaine} de {filters.annee}
+                <strong>{pointages.length}</strong>
+                {' '}
+                pointage(s) trouvé(s) de
+                {' '}
+                {formatWeekYearLabel({ annee: filters.start_annee, numero_semaine: filters.start_numero_semaine })}
+                {' '}
+                à
+                {' '}
+                {formatWeekYearLabel({ annee: filters.end_annee, numero_semaine: filters.end_numero_semaine })}
               </p>
               <Table striped bordered hover responsive>
                 <thead>
                   <tr>
-                    <th>Utilisateur</th>
-                    <th>Projet</th>
-                    <th>Code Pointage</th>
-                    <th>Début</th>
-                    <th>Fin</th>
-                    <th>Jours</th>
-                    <th>Notes</th>
+                    {previewColumns.map((column) => (
+                      <th key={column.id} className="text-center align-middle">{column.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {pointages.slice(0, 10).map((item) => (
                     <tr key={item.id}>
-                      <td>{item.utilisateur?.nom || 'N/A'}</td>
-                      <td>{item.projet?.nom || 'N/A'}</td>
-                      <td>{item.projet?.code_pointage?.code || 'N/A'}</td>
-                      <td>
-                        {formatDateDDMMYYYY(item.date_debut)}
-                        {' '}
-                        <small className="text-muted">
-                          ({PERIODE_LABELS[item.periode_debut] || item.periode_debut})
-                        </small>
-                      </td>
-                      <td>
-                        {formatDateDDMMYYYY(item.date_fin)}
-                        {' '}
-                        <small className="text-muted">
-                          ({PERIODE_LABELS[item.periode_fin] || item.periode_fin})
-                        </small>
-                      </td>
-                      <td>
-                        <strong>
-                          {calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)}
-                        </strong>
-                      </td>
-                      <td>{item.note || <span className="text-muted">—</span>}</td>
+                      {previewColumns.map((column) => {
+                        const value = column.getValue(item);
+                        return (
+                          <td key={`${item.id}-${column.id}`}>
+                            {value === '' ? <span className="text-muted">—</span> : value}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

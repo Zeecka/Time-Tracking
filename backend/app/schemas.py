@@ -37,7 +37,10 @@ class UtilisateurSchema(ma.SQLAlchemyAutoSchema):
 
 class PointageSchema(ma.SQLAlchemyAutoSchema):
     utilisateur = ma.Nested(UtilisateurSchema, only=["id", "nom", "couleur"])
-    projet = ma.Nested(ProjetSchema, only=["id", "nom", "couleur", "motif"])
+    projet = ma.Nested(
+        ProjetSchema,
+        only=["id", "nom", "couleur", "motif", "code_pointage_id", "code_pointage"],
+    )
 
     class Meta:
         model = Pointage
