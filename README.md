@@ -112,6 +112,15 @@ Documentation technique (structure du projet + API REST) : [docs/README_DEV.md](
 - Contrainte d'unicité : un seul pointage par utilisateur/projet/semaine/année
 - Interface de type tableur pour une saisie rapide
 
+### Import / Export CSV
+- Import CSV pour **Utilisateurs**, **Codes Pointage**, **Projets** et **Pointages**
+- Export CSV pour **Utilisateurs**, **Codes Pointage**, **Projets** et **Pointages**
+- Fichiers CSV d'exemple téléchargeables depuis l'interface :
+	- `/examples/utilisateurs_exemple.csv`
+	- `/examples/codes_pointage_exemple.csv`
+	- `/examples/projets_exemple.csv`
+	- `/examples/pointages_exemple.csv`
+
 ## Développement
 
 Toute la documentation de développement (setup, seed, exécution locale, type-checking, notes techniques) est disponible dans [docs/README_DEV.md](docs/README_DEV.md).
@@ -121,7 +130,6 @@ Toute la documentation de développement (setup, seed, exécution locale, type-c
 - [ ] Authentification OIDC
 - [ ] Interface type tableur avancée (AG-Grid)
 - [ ] Rapports et statistiques (agrégations par projet/utilisateur/période)
-- [ ] Import/Export CSV
 - [ ] Gestion des permissions utilisateurs
 - [ ] Soft delete pour l'historique
 - [ ] API de recherche full-text

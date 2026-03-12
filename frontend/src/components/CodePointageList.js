@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Table, Button, Modal, Form, Alert } from 'react-bootstrap';
 import { codePointageAPI } from '../services/api';
 
@@ -8,7 +8,9 @@ function CodePointageList() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({ code: '' });
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const importInputRef = useRef(null);
 
   useEffect(() => {
     loadCodePointages();
@@ -72,6 +74,51 @@ function CodePointageList() {
     }
   };
 
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const response = await codePointageAPI.exportCSV();
+      downloadBlob(response.data, 'codes_pointage.csv');
+      setMessage('Export CSV des codes terminé.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur lors de l’export CSV');
+    }
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const response = await codePointageAPI.importCSV(file);
+      const data = response.data || {};
+      setMessage(
+        `Import CSV codes terminé : ${data.created || 0} créé(s), ${data.skipped || 0} ignoré(s), ${(data.errors || []).length} erreur(s).`
+      );
+      loadCodePointages();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur lors de l’import CSV');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -85,7 +132,30 @@ function CodePointageList() {
         </Button>
       </div>
 
+      <div className="d-flex gap-2 mb-3">
+        <Button variant="outline-primary" size="sm" onClick={handleImportClick}>
+          <i className="fas fa-file-import me-2"></i>
+          Import CSV
+        </Button>
+        <Button variant="outline-success" size="sm" onClick={handleExportCSV}>
+          <i className="fas fa-file-export me-2"></i>
+          Export CSV
+        </Button>
+        <Button variant="outline-secondary" size="sm" as="a" href="/examples/codes_pointage_exemple.csv" download>
+          <i className="fas fa-download me-2"></i>
+          CSV exemple
+        </Button>
+        <Form.Control
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={handleImportCSV}
+          style={{ display: 'none' }}
+        />
+      </div>
+
       {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
 
       {loading ? (
         <p>Chargement...</p>

@@ -11,6 +11,8 @@ Covers:
  - Multi-user isolation (overlapping dates are OK for different users)
 """
 
+import io
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -43,6 +45,35 @@ def put_pointage(client, pointage_id, payload):
     return client.put(
         f"{BASE}/{pointage_id}", json=payload, content_type="application/json"
     )
+
+
+class TestPointageCsvImportExport:
+    def test_export_pointage_csv(self, client, utilisateur_alice, projet_dev):
+        rv_create = post_pointage(client, make_payload(utilisateur_alice.id, projet_dev.id))
+        assert rv_create.status_code == 201
+
+        rv = client.get(f"{BASE}/export-csv")
+        assert rv.status_code == 200
+        body = rv.data.decode("utf-8")
+        assert "date_debut" in body
+        assert "Alice" in body
+        assert "Développement" in body
+
+    def test_import_pointage_csv(self, client, utilisateur_alice, projet_dev):
+        csv_content = (
+            "date_debut,periode_debut,date_fin,periode_fin,numero_semaine,annee,utilisateur,projet,note\n"
+            "2026-03-02,matin,2026-03-02,soir,10,2026,Alice,Développement,Import test\n"
+        )
+        rv = client.post(
+            f"{BASE}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "pointages.csv")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 1
+        assert len(data["errors"]) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -432,15 +463,72 @@ class TestAdjacentMerge:
         assert data["date_debut"] == "2026-03-02"
         assert data["periode_debut"] == "midi"
 
+    def test_no_merge_across_intermediate_half_day_other_project(
+        self, client, utilisateur_alice, projet_dev, projet_bug
+    ):
+        """A Monday full day + B Tuesday morning + A Tuesday afternoon must
+        not merge the two A entries across the occupied Tuesday morning slot."""
+        rv_a_monday = post_pointage(
+            client,
+            make_payload(
+                utilisateur_alice.id,
+                projet_dev.id,
+                date_debut="2026-03-02",
+                periode_debut="matin",
+                date_fin="2026-03-02",
+                periode_fin="soir",
+            ),
+        )
+        assert rv_a_monday.status_code == 201
+        monday_a_id = rv_a_monday.get_json()["id"]
+
+        rv_b_tuesday_morning = post_pointage(
+            client,
+            make_payload(
+                utilisateur_alice.id,
+                projet_bug.id,
+                date_debut="2026-03-03",
+                periode_debut="matin",
+                date_fin="2026-03-03",
+                periode_fin="midi",
+            ),
+        )
+        assert rv_b_tuesday_morning.status_code == 201
+
+        rv_a_tuesday_afternoon = post_pointage(
+            client,
+            make_payload(
+                utilisateur_alice.id,
+                projet_dev.id,
+                date_debut="2026-03-03",
+                periode_debut="midi",
+                date_fin="2026-03-03",
+                periode_fin="soir",
+            ),
+        )
+        assert rv_a_tuesday_afternoon.status_code == 201
+
+        tuesday_a = rv_a_tuesday_afternoon.get_json()
+        assert tuesday_a["date_debut"] == "2026-03-03"
+        assert tuesday_a["periode_debut"] == "midi"
+        assert tuesday_a["date_fin"] == "2026-03-03"
+        assert tuesday_a["periode_fin"] == "soir"
+
+        monday_a = client.get(f"{BASE}/{monday_a_id}")
+        assert monday_a.status_code == 200
+        monday_a_data = monday_a.get_json()
+        assert monday_a_data["date_debut"] == "2026-03-02"
+        assert monday_a_data["date_fin"] == "2026-03-02"
+
     def test_three_way_merge(self, client, utilisateur_alice, projet_dev):
         """Adding a new entry that bridges two non-adjacent existing entries
         triggers a three-way merge: before + new + after → one entry.
 
-        A = Monday   matin→midi  (2026-03-02)
+        A = Monday   matin→soir  (2026-03-02)
         C = Wednesday matin→soir (2026-03-04)  ← NOT adjacent to A (Tuesday gap)
         B = Tuesday   matin→soir (2026-03-03)  ← bridges A and C
         """
-        # A — Monday matin→midi
+        # A — Monday matin→soir
         rv_left = post_pointage(
             client,
             make_payload(
@@ -449,7 +537,7 @@ class TestAdjacentMerge:
                 date_debut="2026-03-02",
                 periode_debut="matin",
                 date_fin="2026-03-02",
-                periode_fin="midi",
+                periode_fin="soir",
             ),
         )
         assert rv_left.status_code == 201

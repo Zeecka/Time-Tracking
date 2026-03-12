@@ -1,7 +1,10 @@
+import csv
+import io
+
 from app.extensions import db
 from app.models import CodePointage
 from app.schemas import code_pointage_schema, code_pointages_schema
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 code_pointage_bp = Blueprint('code_pointage', __name__)
@@ -94,6 +97,74 @@ def delete_code_pointage(id):
         db.session.commit()
 
         return '', 204
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@code_pointage_bp.route('/export-csv', methods=['GET'])
+def export_code_pointages_csv():
+    """Export all codes as CSV."""
+    codes = CodePointage.query.order_by(CodePointage.code).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['code'])
+
+    for code in codes:
+        writer.writerow([code.code])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=codes_pointage.csv'},
+    )
+
+
+@code_pointage_bp.route('/import-csv', methods=['POST'])
+def import_code_pointages_csv():
+    """Import codes from CSV file."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'CSV file is required in form field "file"'}), 400
+
+        csv_file = request.files['file']
+        if not csv_file or not csv_file.filename:
+            return jsonify({'error': 'CSV file is required'}), 400
+
+        content = csv_file.stream.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+
+        if not reader.fieldnames or 'code' not in reader.fieldnames:
+            return jsonify({'error': 'CSV header must contain: code'}), 400
+
+        created = 0
+        skipped = 0
+        errors = []
+
+        for idx, row in enumerate(reader, start=2):
+            code_value = str(row.get('code', '')).strip()
+
+            if not code_value:
+                errors.append({'line': idx, 'error': 'code is required'})
+                continue
+
+            existing = CodePointage.query.filter_by(code=code_value).first()
+            if existing:
+                skipped += 1
+                continue
+
+            db.session.add(CodePointage(code=code_value))
+            created += 1
+
+        db.session.commit()
+
+        status = 201 if created > 0 else 200
+        return jsonify({'created': created, 'skipped': skipped, 'errors': errors}), status
 
     except Exception as e:
         db.session.rollback()

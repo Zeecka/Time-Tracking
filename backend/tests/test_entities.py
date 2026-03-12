@@ -10,6 +10,8 @@ Covers:
  - Colour validation
 """
 
+import io
+
 BASE_CODE = "/api/v1/code-pointage"
 BASE_PROJ = "/api/v1/projets"
 BASE_USER = "/api/v1/utilisateurs"
@@ -246,3 +248,46 @@ class TestUtilisateurCRUD:
         rv2 = client.post(BASE_USER, json={"nom": "NoSub2", "couleur": "#222222"})
         assert rv1.status_code == 201
         assert rv2.status_code == 201
+
+
+class TestCsvImportExport:
+    def test_export_code_csv(self, client, code_dev):
+        rv = client.get(f"{BASE_CODE}/export-csv")
+        assert rv.status_code == 200
+        body = rv.data.decode("utf-8")
+        assert "code" in body
+        assert "DEV" in body
+
+    def test_import_code_csv(self, client):
+        csv_content = "code\nDEV\nABS\n"
+        rv = client.post(
+            f"{BASE_CODE}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "codes.csv")},
+            content_type="multipart/form-data",
+        )
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 2
+
+    def test_import_utilisateur_csv_create_and_update(self, client, utilisateur_alice):
+        csv_content = "nom,couleur,sub\nAlice,#ff0000,\nClaire,#123456,oidc|claire\n"
+        rv = client.post(
+            f"{BASE_USER}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "users.csv")},
+            content_type="multipart/form-data",
+        )
+        assert rv.status_code in (200, 201)
+        data = rv.get_json()
+        assert data["updated"] == 1
+        assert data["created"] == 1
+
+    def test_import_projet_csv(self, client, code_dev):
+        csv_content = "nom,couleur,motif,code_pointage\nOnboarding,#abcdef,pointille,DEV\n"
+        rv = client.post(
+            f"{BASE_PROJ}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.csv")},
+            content_type="multipart/form-data",
+        )
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 1

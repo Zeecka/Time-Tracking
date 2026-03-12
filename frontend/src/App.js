@@ -23,8 +23,23 @@ const getInitialTheme = () => {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
+const getCurrentIsoWeekInfo = () => {
+  const now = new Date();
+  const utcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const day = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+  const year = utcDate.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+
+  return { year, week };
+};
+
 function App() {
   const [theme, setTheme] = useState(getInitialTheme);
+  const currentIsoWeek = getCurrentIsoWeekInfo();
+  const pointagesCurrentWeekPath = `/pointages/table?year=${currentIsoWeek.year}&week=${currentIsoWeek.week}`;
+  const ganttCurrentWeekPath = `/pointages/gantt?year=${currentIsoWeek.year}&week=${currentIsoWeek.week}`;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-bs-theme', theme);
@@ -62,10 +77,10 @@ function App() {
                 <Nav.Link as={Link} to="/">
                   Accueil
                 </Nav.Link>
-                <Nav.Link as={Link} to="/pointages/table">
+                <Nav.Link as={Link} to={pointagesCurrentWeekPath}>
                   Pointages
                 </Nav.Link>
-                <Nav.Link as={Link} to="/pointages/gantt">
+                <Nav.Link as={Link} to={ganttCurrentWeekPath}>
                   Gantt
                 </Nav.Link>
                 <Nav.Link as={Link} to="/projets">

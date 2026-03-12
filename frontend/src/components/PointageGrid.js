@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Table, Button, Modal, Form, Alert, Row, Col } from 'react-bootstrap';
 import { Link, useSearchParams } from 'react-router-dom';
 import Select from 'react-select';
@@ -27,11 +27,24 @@ const getIsoWeekNumber = (date) => {
 
 const getIsoWeeksInYear = (year) => getIsoWeekNumber(new Date(Date.UTC(year, 11, 28)));
 
+const parseOptionalInteger = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
+};
+
 const sanitizeWeekYear = (year, week) => {
-  const parsedYear = Number.isFinite(Number(year)) ? parseInt(year, 10) : CURRENT_WEEK_INFO.year;
+  const parsedYear = parseOptionalInteger(year) ?? CURRENT_WEEK_INFO.year;
   const safeYear = Math.min(2100, Math.max(2000, parsedYear));
   const maxWeeks = getIsoWeeksInYear(safeYear);
-  const parsedWeek = Number.isFinite(Number(week)) ? parseInt(week, 10) : CURRENT_WEEK_INFO.week;
+  const parsedWeek = parseOptionalInteger(week) ?? CURRENT_WEEK_INFO.week;
   const safeWeek = Math.min(maxWeeks, Math.max(1, parsedWeek));
 
   return { annee: safeYear, numero_semaine: safeWeek };
@@ -166,6 +179,8 @@ const formatDayValue = (value) => {
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace('.', ',');
 };
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
 function PointageGrid({ viewMode = 'table' }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialYear = searchParams.get('year');
@@ -193,6 +208,7 @@ function PointageGrid({ viewMode = 'table' }) {
     numero_semaine: initialFilters.numero_semaine,
   });
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [projectSearchText, setProjectSearchText] = useState('');
   const [sortColumn, setSortColumn] = useState(null);
@@ -203,8 +219,16 @@ function PointageGrid({ viewMode = 'table' }) {
   const [conflictingPointages, setConflictingPointages] = useState([]);
   const [pendingFormData, setPendingFormData] = useState(null);
   const [pendingEditingItem, setPendingEditingItem] = useState(null);
+  const [ganttResizeState, setGanttResizeState] = useState(null);
+  const ganttResizeStateRef = useRef(null);
+  const suppressGanttClickUntilRef = useRef(0);
+  const importCsvInputRef = useRef(null);
   const isTableView = viewMode === 'table';
   const isGanttView = viewMode === 'gantt';
+
+  useEffect(() => {
+    ganttResizeStateRef.current = ganttResizeState;
+  }, [ganttResizeState]);
 
   const loadPointages = useCallback(async (filterParams) => {
     try {
@@ -268,6 +292,22 @@ function PointageGrid({ viewMode = 'table' }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.annee, filters.numero_semaine]);
+
+  const selectedWeekRange = useMemo(() => {
+    if (!Number.isFinite(filters.annee) || !Number.isFinite(filters.numero_semaine)) {
+      return getIsoWeekDateRange(CURRENT_WEEK_INFO.year, CURRENT_WEEK_INFO.week);
+    }
+    return getIsoWeekDateRange(filters.annee, filters.numero_semaine);
+  }, [filters.annee, filters.numero_semaine]);
+
+  const startOfWeekUtc = useMemo(
+    () => new Date(`${selectedWeekRange.date_debut}T00:00:00Z`),
+    [selectedWeekRange.date_debut]
+  );
+  const endOfWeekUtc = useMemo(
+    () => new Date(`${selectedWeekRange.date_fin}T23:59:59Z`),
+    [selectedWeekRange.date_fin]
+  );
 
   const handleShowModal = (item = null) => {
     const normalizePeriodeDebut = (value) => {
@@ -404,17 +444,6 @@ function PointageGrid({ viewMode = 'table' }) {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pointage ?')) {
-      try {
-        await pointageAPI.delete(id);
-        loadPointages(filters);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Erreur lors de la suppression');
-      }
-    }
-  };
-
   const getDateAndPeriodFromSlot = (slotIndex) => {
     const dayIndex = Math.floor(slotIndex / 2);
     const isAfternoon = slotIndex % 2 === 1;
@@ -429,15 +458,38 @@ function PointageGrid({ viewMode = 'table' }) {
     };
   };
 
-  const findOverlappingPointages = (utilisateurId, dateDebut, periodeDebut, dateFin, periodeFin, excludeId = null) => {
-    return pointages.filter((p) => {
-      // Exclure le pointage en cours d'édition
-      if (excludeId && p.id === excludeId) return false;
+  const getDateAndPeriodFromBoundary = useCallback((boundaryIndex, isStart) => {
+    const safeBoundary = clamp(boundaryIndex, isStart ? 0 : 1, isStart ? 9 : 10);
 
-      // Même utilisateur uniquement
+    if (isStart) {
+      const dayIndex = Math.floor(safeBoundary / 2);
+      const isAfternoon = safeBoundary % 2 === 1;
+      const date = new Date(startOfWeekUtc);
+      date.setUTCDate(startOfWeekUtc.getUTCDate() + dayIndex);
+
+      return {
+        date: date.toISOString().split('T')[0],
+        periode: isAfternoon ? 'midi' : 'matin',
+      };
+    }
+
+    const adjustedIndex = safeBoundary - 1;
+    const dayIndex = Math.floor(adjustedIndex / 2);
+    const isMiddayBoundary = adjustedIndex % 2 === 0;
+    const date = new Date(startOfWeekUtc);
+    date.setUTCDate(startOfWeekUtc.getUTCDate() + dayIndex);
+
+    return {
+      date: date.toISOString().split('T')[0],
+      periode: isMiddayBoundary ? 'midi' : 'soir',
+    };
+  }, [startOfWeekUtc]);
+
+  const findOverlappingPointages = useCallback((utilisateurId, dateDebut, periodeDebut, dateFin, periodeFin, excludeId = null) => {
+    return pointages.filter((p) => {
+      if (excludeId && p.id === excludeId) return false;
       if (p.utilisateur_id !== utilisateurId) return false;
 
-      // Normaliser les périodes
       const newStart = new Date(dateDebut + 'T00:00:00Z');
       const newEnd = new Date(dateFin + 'T00:00:00Z');
       const newStartPeriode = normalizePeriodeValue(periodeDebut, true);
@@ -448,38 +500,154 @@ function PointageGrid({ viewMode = 'table' }) {
       const pStartPeriode = normalizePeriodeValue(p.periode_debut, true);
       const pEndPeriode = normalizePeriodeValue(p.periode_fin, false);
 
-      // Pas de chevauchement si les plages de dates ne se touchent pas
       if (newEnd < pStart || newStart > pEnd) return false;
 
-      // Vérifier les chevauchements plus précis avec les périodes
-      // Cas 1: Nouveau pointage complètement avant l'existant
       if (newEnd.getTime() === pStart.getTime()) {
-        // Même jour de fin et de début
         if (newEndPeriode === 'midi' && pStartPeriode === 'midi') return false;
         if (newEndPeriode === 'midi' && pStartPeriode === 'matin') return false;
       }
 
-      // Cas 2: Nouveau pointage complètement après l'existant
       if (newStart.getTime() === pEnd.getTime()) {
-        // Même jour de début et de fin
         if (newStartPeriode === 'midi' && pEndPeriode === 'midi') return false;
       }
 
-      // Cas 3: Même jour pour début et fin
       if (dateDebut === dateFin && p.date_debut === p.date_fin && dateDebut === p.date_debut) {
-        // Les deux sont sur le même jour
         if (newStartPeriode === 'matin' && newEndPeriode === 'midi' && pStartPeriode === 'midi' && pEndPeriode === 'soir') {
-          return false; // matin-midi vs midi-soir : pas de conflit
+          return false;
         }
         if (newStartPeriode === 'midi' && newEndPeriode === 'soir' && pStartPeriode === 'matin' && pEndPeriode === 'midi') {
-          return false; // midi-soir vs matin-midi : pas de conflit
+          return false;
         }
       }
 
-      // Sinon il y a un chevauchement
       return true;
     });
+  }, [pointages]);
+
+  const startGanttResize = (event, bar, edge) => {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressGanttClickUntilRef.current = Date.now() + 250;
+
+    const timelineCell = event.currentTarget.closest('.gantt-timeline-cell');
+    if (!timelineCell) {
+      return;
+    }
+
+    const rect = timelineCell.getBoundingClientRect();
+    setGanttResizeState({
+      pointageId: bar.id,
+      edge,
+      startSlot: bar.startSlot,
+      endSlot: bar.endSlot,
+      currentStartSlot: bar.startSlot,
+      currentEndSlot: bar.endSlot,
+      timelineLeft: rect.left,
+      timelineWidth: rect.width,
+    });
   };
+
+  useEffect(() => {
+    if (!ganttResizeState) {
+      return undefined;
+    }
+
+    const commitGanttResize = async (resizeData) => {
+      if (!resizeData || resizeData.currentStartSlot >= resizeData.currentEndSlot) {
+        return;
+      }
+
+      const targetPointage = pointages.find((item) => item.id === resizeData.pointageId);
+      if (!targetPointage) {
+        return;
+      }
+
+      const nextStart = getDateAndPeriodFromBoundary(resizeData.currentStartSlot, true);
+      const nextEnd = getDateAndPeriodFromBoundary(resizeData.currentEndSlot, false);
+      const hasChanged = (
+        nextStart.date !== targetPointage.date_debut
+        || nextStart.periode !== normalizePeriodeValue(targetPointage.periode_debut, true)
+        || nextEnd.date !== targetPointage.date_fin
+        || nextEnd.periode !== normalizePeriodeValue(targetPointage.periode_fin, false)
+      );
+
+      if (!hasChanged) {
+        return;
+      }
+
+      const conflicts = findOverlappingPointages(
+        targetPointage.utilisateur_id,
+        nextStart.date,
+        nextStart.periode,
+        nextEnd.date,
+        nextEnd.periode,
+        targetPointage.id
+      );
+
+      if (conflicts.length > 0) {
+        setError('Impossible de redimensionner: la nouvelle période chevauche un autre pointage.');
+        return;
+      }
+
+      try {
+        await pointageAPI.update(targetPointage.id, {
+          date_debut: nextStart.date,
+          periode_debut: nextStart.periode,
+          date_fin: nextEnd.date,
+          periode_fin: nextEnd.periode,
+          numero_semaine: targetPointage.numero_semaine,
+          annee: targetPointage.annee,
+          utilisateur_id: targetPointage.utilisateur_id,
+          projet_id: targetPointage.projet_id,
+          note: targetPointage.note || '',
+        });
+        await loadPointages(filters);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Erreur lors du redimensionnement du pointage');
+      }
+    };
+
+    const handleMouseMove = (event) => {
+      setGanttResizeState((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const ratio = (event.clientX - prev.timelineLeft) / prev.timelineWidth;
+        const normalizedRatio = clamp(ratio, 0, 1);
+
+        if (prev.edge === 'start') {
+          const rawStartSlot = Math.floor(normalizedRatio * 10);
+          const nextStartSlot = clamp(rawStartSlot, 0, prev.currentEndSlot - 1);
+          return { ...prev, currentStartSlot: nextStartSlot };
+        }
+
+        const rawEndSlot = Math.ceil(normalizedRatio * 10);
+        const nextEndSlot = clamp(rawEndSlot, prev.currentStartSlot + 1, 10);
+        return { ...prev, currentEndSlot: nextEndSlot };
+      });
+    };
+
+    const handleMouseUp = () => {
+      const currentResizeState = ganttResizeStateRef.current;
+      suppressGanttClickUntilRef.current = Date.now() + 250;
+      setGanttResizeState(null);
+
+      if (!currentResizeState) {
+        return;
+      }
+
+      commitGanttResize(currentResizeState);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [filters, findOverlappingPointages, ganttResizeState, getDateAndPeriodFromBoundary, loadPointages, pointages]);
 
   const handleSlotClick = (utilisateurId, projetId, slotIndex) => {
     const slotData = getDateAndPeriodFromSlot(slotIndex);
@@ -712,21 +880,6 @@ function PointageGrid({ viewMode = 'table' }) {
     return { date: dateRange.date_debut, periode: 'matin' };
   };
 
-  const applyDefaultStartForUser = (utilisateurId) => {
-    const selectedYear = parseInt(filters.annee, 10) || CURRENT_WEEK_INFO.year;
-    const selectedWeek = parseInt(filters.numero_semaine, 10) || CURRENT_WEEK_INFO.week;
-    const firstAvailable = findFirstAvailableSlot(utilisateurId, selectedYear, selectedWeek);
-
-    setFormData((prev) => ({
-      ...prev,
-      utilisateur_id: utilisateurId,
-      date_debut: firstAvailable.date,
-      periode_debut: firstAvailable.periode,
-      date_fin: firstAvailable.date,
-      periode_fin: 'soir',
-    }));
-  };
-
   const handleSort = (column) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -786,14 +939,6 @@ function PointageGrid({ viewMode = 'table' }) {
     return sortDirection === 'asc' ? <i className="fas fa-sort-up ms-1"></i> : <i className="fas fa-sort-down ms-1"></i>;
   };
 
-  const getSelectedWeekRange = () => {
-    if (!Number.isFinite(filters.annee) || !Number.isFinite(filters.numero_semaine)) {
-      return getIsoWeekDateRange(CURRENT_WEEK_INFO.year, CURRENT_WEEK_INFO.week);
-    }
-    return getIsoWeekDateRange(filters.annee, filters.numero_semaine);
-  };
-
-  const selectedWeekRange = getSelectedWeekRange();
   const selectedWeekLabel = `Lundi ${formatFrenchShortDate(selectedWeekRange.monday)} - Vendredi ${formatFrenchShortDate(selectedWeekRange.friday)}`;
   const weekQueryString = `?year=${filters.annee}&week=${filters.numero_semaine}`;
   const sortedPointages = getSortedPointages();
@@ -834,9 +979,6 @@ function PointageGrid({ viewMode = 'table' }) {
       shortDate: new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(date),
     };
   });
-
-  const startOfWeekUtc = new Date(`${selectedWeekRange.date_debut}T00:00:00Z`);
-  const endOfWeekUtc = new Date(`${selectedWeekRange.date_fin}T23:59:59Z`);
 
   const ganttVisiblePointages = pointages.filter((item) => {
     if (!item?.date_debut || !item?.date_fin) {
@@ -904,6 +1046,8 @@ function PointageGrid({ viewMode = 'table' }) {
     row.bars.push({
       id: item.id,
       pointage: item,
+      startSlot: clampedStart,
+      endSlot: clampedEnd,
       leftPercent: (clampedStart / 10) * 100,
       widthPercent: (span / 10) * 100,
     });
@@ -993,6 +1137,54 @@ function PointageGrid({ viewMode = 'table' }) {
     }),
   };
 
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const response = await pointageAPI.exportCSV({
+        annee: filters.annee,
+        numero_semaine: filters.numero_semaine,
+      });
+      downloadBlob(response.data, `pointages_${filters.annee}_S${filters.numero_semaine}.csv`);
+      setMessage('Export CSV des pointages terminé pour la semaine filtrée.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur lors de l’export CSV');
+    }
+  };
+
+  const handleImportCSVClick = () => {
+    importCsvInputRef.current?.click();
+  };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const response = await pointageAPI.importCSV(file);
+      const data = response.data || {};
+      setMessage(
+        `Import CSV pointages : ${data.created || 0} créé(s), ${(data.errors || []).length} erreur(s).`
+      );
+      await loadPointages(filters);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur lors de l’import CSV');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -1000,10 +1192,31 @@ function PointageGrid({ viewMode = 'table' }) {
           <i className="fas fa-clock me-2" style={{ color: '#2ecc71' }}></i>
           {isGanttView ? 'Pointages - Vue Gantt' : 'Pointages - Vue Tableau'}
         </h2>
-        <Button variant="primary" onClick={() => handleShowModal()}>
-          <i className="fas fa-plus me-2"></i>
-          Nouveau pointage
-        </Button>
+        <div className="d-flex gap-2 flex-wrap justify-content-end align-items-center">
+          <Button variant="outline-primary" size="sm" onClick={handleImportCSVClick} className="d-inline-flex align-items-center">
+            <i className="fas fa-file-import me-2"></i>
+            Import CSV
+          </Button>
+          <Button variant="outline-success" size="sm" onClick={handleExportCSV} className="d-inline-flex align-items-center">
+            <i className="fas fa-file-export me-2"></i>
+            Export CSV
+          </Button>
+          <Button variant="outline-secondary" size="sm" as="a" href="/examples/pointages_exemple.csv" download className="d-inline-flex align-items-center">
+            <i className="fas fa-download me-2"></i>
+            CSV exemple
+          </Button>
+          <Button variant="primary" onClick={() => handleShowModal()} className="d-inline-flex align-items-center">
+            <i className="fas fa-plus me-2"></i>
+            Nouveau pointage
+          </Button>
+          <Form.Control
+            ref={importCsvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleImportCSV}
+            style={{ display: 'none' }}
+          />
+        </div>
       </div>
 
       <Row className="mb-3">
@@ -1030,6 +1243,7 @@ function PointageGrid({ viewMode = 'table' }) {
       </Row>
 
       {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
 
       {/* Filters */}
       <Row className="mb-3">
@@ -1154,28 +1368,61 @@ function PointageGrid({ viewMode = 'table' }) {
                         <div
                           key={`${row.key}-slot-${slotIndex}`}
                           className="gantt-slot gantt-slot-clickable"
-                          onClick={() => handleSlotClick(row.utilisateurId, row.projetId, slotIndex)}
+                          onClick={() => {
+                            if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
+                              return;
+                            }
+                            handleSlotClick(row.utilisateurId, row.projetId, slotIndex);
+                          }}
                           title="Cliquer pour ajouter un pointage"
                         />
                       ))}
                     </div>
-                    {row.bars.map((bar) => (
-                      <div
-                        key={bar.id}
-                        className="gantt-bar"
-                        style={{
-                          left: `${bar.leftPercent}%`,
-                          width: `${bar.widthPercent}%`,
-                          ...getMotifStyle(row.projetCouleur, row.projetMotif),
-                        }}
-                        title={`${row.utilisateurNom} · ${row.projetNom}${bar.pointage.note ? ` · 📝 ${bar.pointage.note}` : ''} · Clic gauche: modifier · Clic droit: supprimer`}
-                        onClick={() => handleShowModal(bar.pointage)}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          handleDeleteClick(bar.pointage);
-                        }}
-                      />
-                    ))}
+                    {row.bars.map((bar) => {
+                      const isResizingBar = ganttResizeState?.pointageId === bar.id;
+                      const previewStart = isResizingBar ? ganttResizeState.currentStartSlot : bar.startSlot;
+                      const previewEnd = isResizingBar ? ganttResizeState.currentEndSlot : bar.endSlot;
+                      const previewSpan = previewEnd - previewStart;
+
+                      return (
+                        <div
+                          key={bar.id}
+                          className={`gantt-bar ${isResizingBar ? 'gantt-bar-resizing' : ''}`}
+                          style={{
+                            left: `${(previewStart / 10) * 100}%`,
+                            width: `${(previewSpan / 10) * 100}%`,
+                            ...getMotifStyle(row.projetCouleur, row.projetMotif),
+                          }}
+                          title={`${row.utilisateurNom} · ${row.projetNom}${bar.pointage.note ? ` · 📝 ${bar.pointage.note}` : ''} · Clic gauche: modifier · Clic droit: supprimer · Poignées: étirer/réduire`}
+                          onClick={() => {
+                            if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
+                              return;
+                            }
+                            handleShowModal(bar.pointage);
+                          }}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
+                              return;
+                            }
+                            handleDeleteClick(bar.pointage);
+                          }}
+                        >
+                          <div
+                            className="gantt-bar-handle gantt-bar-handle-start"
+                            onMouseDown={(event) => startGanttResize(event, bar, 'start')}
+                            onClick={(event) => event.stopPropagation()}
+                            title="Réduire/étirer le début"
+                          />
+                          <div
+                            className="gantt-bar-handle gantt-bar-handle-end"
+                            onMouseDown={(event) => startGanttResize(event, bar, 'end')}
+                            onClick={(event) => event.stopPropagation()}
+                            title="Réduire/étirer la fin"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 );

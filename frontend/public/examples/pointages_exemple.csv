@@ -1,0 +1,3 @@
+date_debut,periode_debut,date_fin,periode_fin,numero_semaine,annee,utilisateur,projet,note
+2026-03-02,matin,2026-03-02,soir,10,2026,Alice,Développement,Développement sprint
+2026-03-03,matin,2026-03-03,midi,10,2026,Bob,Bug Fix,Correction anomalies

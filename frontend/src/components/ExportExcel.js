@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Form, Alert, Row, Col, Card, Table } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
-import { pointageAPI, utilisateurAPI, projetAPI } from '../services/api';
+import { pointageAPI } from '../services/api';
 
 const getCurrentIsoWeekInfo = () => {
   const now = new Date();
@@ -205,7 +205,6 @@ function ExportExcel() {
       ws['!cols'] = columnWidths;
 
       // Ajouter la feuille au workbook
-      const weekRange = getIsoWeekDateRange(filters.annee, filters.numero_semaine);
       const sheetName = `S${filters.numero_semaine}_${filters.annee}`;
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
 

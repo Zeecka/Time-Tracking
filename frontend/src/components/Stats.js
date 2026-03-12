@@ -4,7 +4,7 @@ import {
 } from 'react-bootstrap';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
+  ResponsiveContainer, PieChart, Pie, Cell,
   LabelList,
 } from 'recharts';
 import { statsAPI, utilisateurAPI } from '../services/api';

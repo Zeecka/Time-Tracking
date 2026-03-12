@@ -308,6 +308,35 @@
   cursor: pointer;
 }
 
+.gantt-bar-resizing {
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.gantt-bar-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.gantt-bar-handle-start {
+  left: 0;
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+  cursor: ew-resize;
+}
+
+.gantt-bar-handle-end {
+  right: 0;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+  cursor: ew-resize;
+}
+
 .gantt-empty {
   padding: 0.9rem;
   text-align: center;

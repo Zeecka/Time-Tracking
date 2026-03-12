@@ -1,9 +1,11 @@
+import csv
+import io
 import re
 
 from app.extensions import db
 from app.models import Utilisateur
 from app.schemas import utilisateur_schema, utilisateurs_schema
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 utilisateur_bp = Blueprint('utilisateur', __name__)
@@ -117,6 +119,101 @@ def delete_utilisateur(id):
         db.session.commit()
 
         return '', 204
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@utilisateur_bp.route('/export-csv', methods=['GET'])
+def export_utilisateurs_csv():
+    """Export all users as CSV."""
+    utilisateurs = Utilisateur.query.order_by(Utilisateur.nom).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['nom', 'couleur', 'sub'])
+
+    for utilisateur in utilisateurs:
+        writer.writerow([utilisateur.nom, utilisateur.couleur, utilisateur.sub or ''])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=utilisateurs.csv'},
+    )
+
+
+@utilisateur_bp.route('/import-csv', methods=['POST'])
+def import_utilisateurs_csv():
+    """Import users from CSV file."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'CSV file is required in form field "file"'}), 400
+
+        csv_file = request.files['file']
+        if not csv_file or not csv_file.filename:
+            return jsonify({'error': 'CSV file is required'}), 400
+
+        content = csv_file.stream.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+
+        required_headers = {'nom', 'couleur'}
+        if not reader.fieldnames or not required_headers.issubset(set(reader.fieldnames)):
+            return jsonify({'error': 'CSV header must contain: nom,couleur (sub optional)'}), 400
+
+        created = 0
+        updated = 0
+        errors = []
+
+        for idx, row in enumerate(reader, start=2):
+            nom = str(row.get('nom', '')).strip()
+            couleur = str(row.get('couleur', '')).strip()
+            sub = str(row.get('sub', '')).strip() or None
+
+            if not nom or not couleur:
+                errors.append({'line': idx, 'error': 'nom and couleur are required'})
+                continue
+
+            if not validate_hex_color(couleur):
+                errors.append({'line': idx, 'error': 'couleur must be in #RRGGBB format'})
+                continue
+
+            target = None
+            if sub:
+                target = Utilisateur.query.filter_by(sub=sub).first()
+            if not target:
+                target = Utilisateur.query.filter_by(nom=nom).first()
+
+            if target:
+                target.nom = nom
+                target.couleur = couleur
+                if sub:
+                    existing_sub = Utilisateur.query.filter(
+                        Utilisateur.sub == sub,
+                        Utilisateur.id != target.id,
+                    ).first()
+                    if existing_sub:
+                        errors.append({'line': idx, 'error': 'sub already used by another user'})
+                        continue
+                target.sub = sub
+                updated += 1
+            else:
+                existing_sub = Utilisateur.query.filter_by(sub=sub).first() if sub else None
+                if existing_sub:
+                    errors.append({'line': idx, 'error': 'sub already used by another user'})
+                    continue
+
+                db.session.add(Utilisateur(nom=nom, couleur=couleur, sub=sub))
+                created += 1
+
+        db.session.commit()
+
+        status = 201 if created > 0 else 200
+        return jsonify({'created': created, 'updated': updated, 'errors': errors}), status
 
     except Exception as e:
         db.session.rollback()
