@@ -1441,14 +1441,15 @@ function PointageGrid({ viewMode = 'table' }) {
                 <th onClick={() => handleSort('projet')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                   Projet {renderSortIcon('projet')}
                 </th>
+                <th onClick={() => handleSort('jours')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Jour(s) {renderSortIcon('jours')}
+                </th>
+                <th>Code Pointage</th>
                 <th onClick={() => handleSort('date_debut')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                   Début {renderSortIcon('date_debut')}
                 </th>
                 <th onClick={() => handleSort('date_fin')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                   Fin {renderSortIcon('date_fin')}
-                </th>
-                <th onClick={() => handleSort('jours')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Jour(s) {renderSortIcon('jours')}
                 </th>
                 <th>Actions</th>
               </tr>
@@ -1471,8 +1472,8 @@ function PointageGrid({ viewMode = 'table' }) {
                     {item.utilisateur?.nom || 'N/A'}
                   </div>
                 </td>
-                <td className="text-center" style={{ fontFamily: 'monospace' }}>
-                  <div className="d-flex align-items-center gap-2 justify-content-center">
+                <td style={{ fontFamily: 'monospace' }}>
+                  <div className="d-flex align-items-center gap-2">
                     <div
                       style={{
                         width: '18px',
@@ -1487,6 +1488,12 @@ function PointageGrid({ viewMode = 'table' }) {
                     {item.projet?.nom || 'N/A'}
                   </div>
                 </td>
+                <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                  {calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)}
+                </td>
+                <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                  {item.projet?.code_pointage?.code || ''}
+                </td>
                 <td className="text-center" style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}>
                   {formatDateDDMMYYYY(item.date_debut)}
                   {' '}
@@ -1500,9 +1507,6 @@ function PointageGrid({ viewMode = 'table' }) {
                   <span style={{ fontSize: '0.85rem', fontStyle: 'italic', textTransform: 'lowercase' }}>
                     ({PERIODE_LABELS[item.periode_fin] || item.periode_fin})
                   </span>
-                </td>
-                <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                  {calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)}
                 </td>
                 <td>
                   <div className="d-flex align-items-center justify-content-center gap-2">
@@ -1544,7 +1548,7 @@ function PointageGrid({ viewMode = 'table' }) {
             ))}
               {pointages.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center">
+                  <td colSpan="7" className="text-center">
                     Aucun pointage trouvé
                   </td>
                 </tr>

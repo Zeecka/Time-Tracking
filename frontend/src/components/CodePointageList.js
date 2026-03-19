@@ -6,7 +6,7 @@ function CodePointageList() {
   const [codePointages, setCodePointages] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ code: '' });
+  const [formData, setFormData] = useState({ code: '', note: '' });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,10 +32,10 @@ function CodePointageList() {
   const handleShowModal = (item = null) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ code: item.code });
+      setFormData({ code: item.code, note: item.note || '' });
     } else {
       setEditingItem(null);
-      setFormData({ code: '' });
+      setFormData({ code: '', note: '' });
     }
     setShowModal(true);
     setError('');
@@ -44,7 +44,7 @@ function CodePointageList() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingItem(null);
-    setFormData({ code: '' });
+    setFormData({ code: '', note: '' });
     setError('');
   };
 
@@ -164,6 +164,7 @@ function CodePointageList() {
           <thead>
             <tr>
               <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>Code</th>
+              <th>Note</th>
               <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
@@ -171,6 +172,7 @@ function CodePointageList() {
             {codePointages.map((item) => (
               <tr key={item.id}>
                 <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>{item.code}</td>
+                <td>{item.note || ''}</td>
                 <td style={{ textAlign: 'center' }}>
                   <div className="d-flex align-items-center justify-content-center gap-2">
                     <Button
@@ -215,10 +217,20 @@ function CodePointageList() {
               <Form.Control
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({ code: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="Entrez le code"
                 required
                 maxLength={128}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Note</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={formData.note}
+                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                placeholder="Note facultative"
               />
             </Form.Group>
           </Modal.Body>
