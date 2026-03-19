@@ -225,6 +225,7 @@ function PointageGrid({ viewMode = 'table' }) {
   const importCsvInputRef = useRef(null);
   const isTableView = viewMode === 'table';
   const isGanttView = viewMode === 'gantt';
+  const [groupedView, setGroupedView] = useState(false);
 
   useEffect(() => {
     ganttResizeStateRef.current = ganttResizeState;
@@ -942,6 +943,32 @@ function PointageGrid({ viewMode = 'table' }) {
   const selectedWeekLabel = `Lundi ${formatFrenchShortDate(selectedWeekRange.monday)} - Vendredi ${formatFrenchShortDate(selectedWeekRange.friday)}`;
   const weekQueryString = `?year=${filters.annee}&week=${filters.numero_semaine}`;
   const sortedPointages = getSortedPointages();
+
+  const groupedPointages = useMemo(() => {
+    const map = {};
+    pointages.forEach((item) => {
+      const utilisateurId = item.utilisateur?.id ?? item.utilisateur_id;
+      const projetId = item.projet?.id ?? item.projet_id;
+      const key = `${utilisateurId}-${projetId}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          utilisateur: item.utilisateur,
+          projet: item.projet,
+          totalJours: 0,
+        };
+      }
+      map[key].totalJours += calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin);
+    });
+    return Object.values(map).sort((a, b) => {
+      const nomA = a.utilisateur?.nom || '';
+      const nomB = b.utilisateur?.nom || '';
+      const cmp = nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.projet?.nom || '').localeCompare(b.projet?.nom || '', 'fr', { sensitivity: 'base' });
+    });
+  }, [pointages]);
+
   const userMissingDaysMap = useMemo(() => {
     const pointedDaysByUser = pointages.reduce((acc, item) => {
       const userId = item.utilisateur_id ?? item.utilisateur?.id;
@@ -1221,7 +1248,7 @@ function PointageGrid({ viewMode = 'table' }) {
 
       <Row className="mb-3">
         <Col>
-          <div className="d-flex gap-2">
+          <div className="d-flex gap-2 align-items-center flex-wrap">
             <Button
               as={Link}
               to={`/pointages/table${weekQueryString}`}
@@ -1238,6 +1265,16 @@ function PointageGrid({ viewMode = 'table' }) {
             >
               Vue Gantt
             </Button>
+            {isTableView && (
+              <Form.Check
+                type="switch"
+                id="grouped-view-switch"
+                label="Vue regroupée"
+                checked={groupedView}
+                onChange={(e) => setGroupedView(e.target.checked)}
+                className="ms-2 mb-0"
+              />
+            )}
           </div>
         </Col>
       </Row>
@@ -1431,7 +1468,70 @@ function PointageGrid({ viewMode = 'table' }) {
           </div>
           )}
 
-          {isTableView && (
+          {isTableView && groupedView && (
+          <Table striped bordered hover className="pointage-table">
+            <thead>
+              <tr>
+                <th>Utilisateur</th>
+                <th>Projet</th>
+                <th>Code Pointage</th>
+                <th className="text-center">Total Jour(s)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupedPointages.map((row) => (
+                <tr key={row.key}>
+                  <td className="text-center" style={{ fontFamily: 'monospace' }}>
+                    <div className="d-flex align-items-center justify-content-center">
+                      <div
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          backgroundColor: row.utilisateur?.couleur || '#ccc',
+                          border: '1px solid #999',
+                          borderRadius: '3px',
+                          marginRight: '8px',
+                        }}
+                      />
+                      {row.utilisateur?.nom || 'N/A'}
+                    </div>
+                  </td>
+                  <td style={{ fontFamily: 'monospace' }}>
+                    <div className="d-flex align-items-center gap-2">
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '3px',
+                          border: '1px solid #999',
+                          flexShrink: 0,
+                          ...getMotifStyle(row.projet?.couleur || '#ccc', row.projet?.motif || 'uni'),
+                        }}
+                        title={`${row.projet?.couleur || '#ccc'} · ${row.projet?.motif || 'uni'}`}
+                      />
+                      {row.projet?.nom || 'N/A'}
+                    </div>
+                  </td>
+                  <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                    {row.projet?.code_pointage?.code || ''}
+                  </td>
+                  <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                    {formatDayValue(row.totalJours)}
+                  </td>
+                </tr>
+              ))}
+              {groupedPointages.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="text-center">
+                    Aucun pointage trouvé
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+          )}
+
+          {isTableView && !groupedView && (
           <Table striped bordered hover className="pointage-table">
             <thead>
               <tr>

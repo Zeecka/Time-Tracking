@@ -31,6 +31,7 @@ services:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
       SECRET_KEY: ${SECRET_KEY}
       CORS_ORIGINS: http://localhost
+      STATS_EXCLUDE_PROJETS: ${STATS_EXCLUDE_PROJETS:-}
     depends_on:
       mariadb:
         condition: service_healthy
