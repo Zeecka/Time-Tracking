@@ -1,7 +1,7 @@
 import calendar
 from datetime import date, timedelta
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from app.models import Pointage, Projet, Utilisateur
 
@@ -281,6 +281,8 @@ def get_stats():
                 }
             )
 
+    exclude_projets = current_app.config.get("STATS_EXCLUDE_PROJETS", [])
+
     return jsonify(
         {
             "periode": {
@@ -297,7 +299,8 @@ def get_stats():
                 users_result, key=lambda x: -x["demi_journees_travaillees"]
             ),
             "projets": sorted(
-                projet_totals.values(), key=lambda x: -x["demi_journees"]
+                (v for v in projet_totals.values() if v["nom"] not in exclude_projets),
+                key=lambda x: -x["demi_journees"],
             ),
             "tendance": tendance,
         }

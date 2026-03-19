@@ -39,7 +39,7 @@ def create_code_pointage():
         if existing:
             return jsonify({"error": "Code already exists"}), 409
 
-        code_pointage = CodePointage(code=data["code"])
+        code_pointage = CodePointage(code=data["code"], note=data.get("note"))
         db.session.add(code_pointage)
         db.session.commit()
 
@@ -71,6 +71,7 @@ def update_code_pointage(id):
             return jsonify({"error": "Code already exists"}), 409
 
         code_pointage.code = data["code"]
+        code_pointage.note = data.get("note")
         db.session.commit()
 
         return jsonify(code_pointage_schema.dump(code_pointage)), 200
@@ -112,10 +113,10 @@ def export_code_pointages_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["code"])
+    writer.writerow(["code", "note"])
 
     for code in codes:
-        writer.writerow([code.code])
+        writer.writerow([code.code, code.note or ""])
 
     csv_content = output.getvalue()
     output.close()
@@ -160,7 +161,8 @@ def import_code_pointages_csv():
                 skipped += 1
                 continue
 
-            db.session.add(CodePointage(code=code_value))
+            note_value = str(row.get("note", "")).strip() or None
+            db.session.add(CodePointage(code=code_value, note=note_value))
             created += 1
 
         db.session.commit()
