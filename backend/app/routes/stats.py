@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
 
-from app.models import Pointage, Projet, Utilisateur
+from app.models import CodePointage, Pointage, Projet, Utilisateur
 
 stats_bp = Blueprint("stats", __name__)
 
@@ -150,6 +150,7 @@ def get_stats():
     utilisateurs = uq.order_by(Utilisateur.nom).all()
 
     projets_map = {p.id: p for p in Projet.query.all()}
+    codes_map = {cp.id: cp for cp in CodePointage.query.all()}
 
     # --- Compute per-user stats -------------------------------------------
     user_stats = {
@@ -163,6 +164,7 @@ def get_stats():
         for u in utilisateurs
     }
     projet_totals = {}
+    code_totals = {}
 
     for p in pointages:
         hd = _count_half_days_in_range(
@@ -198,6 +200,19 @@ def get_stats():
                 "demi_journees": 0,
             }
         projet_totals[p.projet_id]["demi_journees"] += hd
+
+        # Global per-code-pointage accumulation
+        proj = projets_map.get(p.projet_id)
+        if proj:
+            code_id = proj.code_pointage_id
+            if code_id not in code_totals:
+                cp = codes_map.get(code_id)
+                code_totals[code_id] = {
+                    "code_id": code_id,
+                    "code": cp.code if cp else "?",
+                    "demi_journees": 0,
+                }
+            code_totals[code_id]["demi_journees"] += hd
 
     # Build final user list
     users_result = []
@@ -300,6 +315,10 @@ def get_stats():
             ),
             "projets": sorted(
                 (v for v in projet_totals.values() if v["nom"] not in exclude_projets),
+                key=lambda x: -x["demi_journees"],
+            ),
+            "codes_pointage": sorted(
+                code_totals.values(),
                 key=lambda x: -x["demi_journees"],
             ),
             "tendance": tendance,

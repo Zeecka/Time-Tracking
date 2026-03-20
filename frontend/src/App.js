@@ -23,23 +23,8 @@ const getInitialTheme = () => {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
-const getCurrentIsoWeekInfo = () => {
-  const now = new Date();
-  const utcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const day = utcDate.getUTCDay() || 7;
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-  const year = utcDate.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
-
-  return { year, week };
-};
-
 function App() {
   const [theme, setTheme] = useState(getInitialTheme);
-  const currentIsoWeek = getCurrentIsoWeekInfo();
-  const pointagesCurrentWeekPath = `/pointages/table?year=${currentIsoWeek.year}&week=${currentIsoWeek.week}`;
-  const ganttCurrentWeekPath = `/pointages/gantt?year=${currentIsoWeek.year}&week=${currentIsoWeek.week}`;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-bs-theme', theme);
@@ -74,14 +59,8 @@ function App() {
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
             <Navbar.Collapse id="basic-navbar-nav">
               <Nav className="me-auto">
-                <Nav.Link as={Link} to="/">
-                  Accueil
-                </Nav.Link>
-                <Nav.Link as={Link} to={pointagesCurrentWeekPath}>
-                  Pointages
-                </Nav.Link>
-                <Nav.Link as={Link} to={ganttCurrentWeekPath}>
-                  Gantt
+                <Nav.Link as={Link} to="/stats">
+                  Statistiques
                 </Nav.Link>
                 <Nav.Link as={Link} to="/projets">
                   Projets
@@ -130,11 +109,13 @@ function App() {
 
         <Container className="mt-4">
           <Routes>
-            <Route path="/" element={<Stats />} />
+            <Route path="/" element={<PointageGrid viewMode="gantt" />} />
+            <Route path="/stats" element={<Stats />} />
             <Route path="/home" element={<Home />} />
-            <Route path="/pointages" element={<Navigate to="/pointages/table" replace />} />
+            <Route path="/pointages" element={<Navigate to="/pointages/gantt" replace />} />
             <Route path="/pointages/table" element={<PointageGrid viewMode="table" />} />
             <Route path="/pointages/gantt" element={<PointageGrid viewMode="gantt" />} />
+            <Route path="/pointages/synthese" element={<PointageGrid viewMode="synthese" />} />
             <Route path="/projets" element={<ProjetList />} />
             <Route path="/code-pointage" element={<CodePointageList />} />
             <Route path="/utilisateurs" element={<UtilisateurList />} />

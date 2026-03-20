@@ -225,6 +225,7 @@ function PointageGrid({ viewMode = 'table' }) {
   const importCsvInputRef = useRef(null);
   const isTableView = viewMode === 'table';
   const isGanttView = viewMode === 'gantt';
+  const isSyntheseView = viewMode === 'synthese';
   const [groupedView, setGroupedView] = useState(false);
 
   useEffect(() => {
@@ -998,6 +999,32 @@ function PointageGrid({ viewMode = 'table' }) {
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
   }, [utilisateurs, userMissingDaysMap]);
 
+  const syntheseData = useMemo(() => {
+    const usersMap = {};
+    const projectsMap = {};
+    const cellData = {};
+
+    groupedPointages.forEach((row) => {
+      const userId = row.utilisateur?.id ?? 'unknown';
+      const projetId = row.projet?.id ?? 'unknown';
+
+      usersMap[userId] = row.utilisateur;
+      projectsMap[projetId] = row.projet;
+
+      if (!cellData[projetId]) cellData[projetId] = {};
+      cellData[projetId][userId] = (cellData[projetId][userId] || 0) + row.totalJours;
+    });
+
+    const users = Object.values(usersMap).sort((a, b) =>
+      (a?.nom || '').localeCompare(b?.nom || '', 'fr', { sensitivity: 'base' })
+    );
+    const projects = Object.values(projectsMap).sort((a, b) =>
+      (a?.nom || '').localeCompare(b?.nom || '', 'fr', { sensitivity: 'base' })
+    );
+
+    return { users, projects, cellData };
+  }, [groupedPointages]);
+
   const ganttDays = Array.from({ length: 5 }, (_, index) => {
     const date = new Date(selectedWeekRange.monday);
     date.setUTCDate(selectedWeekRange.monday.getUTCDate() + index);
@@ -1217,7 +1244,7 @@ function PointageGrid({ viewMode = 'table' }) {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0" style={{ fontWeight: 700 }}>
           <i className="fas fa-clock me-2" style={{ color: '#2ecc71' }}></i>
-          {isGanttView ? 'Pointages - Vue Gantt' : 'Pointages - Vue Tableau'}
+          {isGanttView ? 'Pointages - Vue Gantt' : isSyntheseView ? 'Pointages - Vue Synthèse' : 'Pointages - Vue Tableau'}
         </h2>
         <div className="d-flex gap-2 flex-wrap justify-content-end align-items-center">
           <Button variant="outline-primary" size="sm" onClick={handleImportCSVClick} className="d-inline-flex align-items-center">
@@ -1251,6 +1278,14 @@ function PointageGrid({ viewMode = 'table' }) {
           <div className="d-flex gap-2 align-items-center flex-wrap">
             <Button
               as={Link}
+              to={`/pointages/gantt${weekQueryString}`}
+              variant={isGanttView ? 'dark' : 'outline-secondary'}
+              size="sm"
+            >
+              Vue Gantt
+            </Button>
+            <Button
+              as={Link}
               to={`/pointages/table${weekQueryString}`}
               variant={isTableView ? 'dark' : 'outline-secondary'}
               size="sm"
@@ -1259,11 +1294,11 @@ function PointageGrid({ viewMode = 'table' }) {
             </Button>
             <Button
               as={Link}
-              to={`/pointages/gantt${weekQueryString}`}
-              variant={isGanttView ? 'dark' : 'outline-secondary'}
+              to={`/pointages/synthese${weekQueryString}`}
+              variant={isSyntheseView ? 'dark' : 'outline-secondary'}
               size="sm"
             >
-              Vue Gantt
+              Vue synthèse
             </Button>
             {isTableView && (
               <Form.Check
@@ -1466,6 +1501,111 @@ function PointageGrid({ viewMode = 'table' }) {
               })
             )}
           </div>
+          )}
+
+          {isSyntheseView && (
+            <div>
+              {syntheseData.projects.length === 0 ? (
+                <p className="text-center text-muted py-4">Aucun pointage trouvé pour cette semaine</p>
+              ) : (
+                <div className="table-responsive">
+                  <Table bordered hover className="pointage-table">
+                    <thead>
+                      <tr>
+                        <th>Projet</th>
+                        <th>Code Pointage</th>
+                        {syntheseData.users.map((u) => (
+                          <th key={u?.id} className="text-center">
+                            <div className="d-flex align-items-center justify-content-center gap-1">
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  backgroundColor: u?.couleur || '#ccc',
+                                  display: 'inline-block',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              {u?.nom || 'N/A'}
+                            </div>
+                          </th>
+                        ))}
+                        <th className="text-center fw-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {syntheseData.projects.map((projet) => {
+                        const projetId = projet?.id ?? 'unknown';
+                        const rowCells = syntheseData.users.map((u) => {
+                          const userId = u?.id ?? 'unknown';
+                          return syntheseData.cellData[projetId]?.[userId] || 0;
+                        });
+                        const rowTotal = rowCells.reduce((s, v) => s + v, 0);
+                        return (
+                          <tr key={projetId}>
+                            <td>
+                              <div className="d-flex align-items-center gap-2">
+                                <div
+                                  style={{
+                                    width: 18,
+                                    height: 18,
+                                    borderRadius: 3,
+                                    border: '1px solid #999',
+                                    flexShrink: 0,
+                                    ...getMotifStyle(projet?.couleur || '#ccc', projet?.motif || 'uni'),
+                                  }}
+                                />
+                                {projet?.nom || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                              {projet?.code_pointage?.code || ''}
+                            </td>
+                            {rowCells.map((val, i) => (
+                              <td key={i} className="text-center" style={{ fontFamily: 'monospace' }}>
+                                {val > 0 ? formatDayValue(val) : '—'}
+                              </td>
+                            ))}
+                            <td className="text-center fw-bold" style={{ fontFamily: 'monospace' }}>
+                              {formatDayValue(rowTotal)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="fw-bold">
+                        <td colSpan={2}>Total</td>
+                        {syntheseData.users.map((u) => {
+                          const userId = u?.id ?? 'unknown';
+                          const colTotal = syntheseData.projects.reduce((s, projet) => {
+                            const projetId = projet?.id ?? 'unknown';
+                            return s + (syntheseData.cellData[projetId]?.[userId] || 0);
+                          }, 0);
+                          return (
+                            <td key={userId} className="text-center" style={{ fontFamily: 'monospace' }}>
+                              {formatDayValue(colTotal)}
+                            </td>
+                          );
+                        })}
+                        <td className="text-center" style={{ fontFamily: 'monospace' }}>
+                          {formatDayValue(
+                            syntheseData.projects.reduce((s, projet) => {
+                              const projetId = projet?.id ?? 'unknown';
+                              return s + syntheseData.users.reduce((ss, u) => {
+                                const userId = u?.id ?? 'unknown';
+                                return ss + (syntheseData.cellData[projetId]?.[userId] || 0);
+                              }, 0);
+                            }, 0)
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </Table>
+                </div>
+              )}
+            </div>
           )}
 
           {isTableView && groupedView && (

@@ -673,6 +673,94 @@ export default function Stats() {
               </Card.Body>
             </Card>
           )}
+
+          {/* Distribution par code pointage */}
+          {stats.codes_pointage && stats.codes_pointage.length > 0 && (
+            <Row className="g-3 mb-4">
+              <Col xs={12} lg={7}>
+                <Card className="h-100">
+                  <Card.Header className="fw-semibold">
+                    <i className="fas fa-tags me-2" style={{ color: '#e67e22' }}></i>
+                    Temps passé par code pointage
+                  </Card.Header>
+                  <Card.Body>
+                    <ResponsiveContainer width="100%" height={Math.max(200, stats.codes_pointage.length * 48)}>
+                      <BarChart
+                        data={stats.codes_pointage}
+                        layout="vertical"
+                        margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
+                        <XAxis
+                          type="number"
+                          tick={{ fill: chartColors.text, fontSize: 11 }}
+                          axisLine={{ stroke: chartColors.axisLine }}
+                          tickLine={false}
+                          label={{ value: 'demi-journées', position: 'insideBottomRight', offset: -10, fill: chartColors.text, fontSize: 11 }}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="code"
+                          width={120}
+                          tick={{ fill: chartColors.text, fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip content={<CustomTooltip unit="demi-j." />} />
+                        <Bar dataKey="demi_journees" name="Demi-journées" fill="#e67e22" radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="demi_journees" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col xs={12} lg={5}>
+                <Card className="h-100">
+                  <Card.Header className="fw-semibold">
+                    <i className="fas fa-chart-pie me-2" style={{ color: '#e67e22' }}></i>
+                    Répartition par code pointage
+                  </Card.Header>
+                  <Card.Body className="d-flex flex-column align-items-center justify-content-center">
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={stats.codes_pointage}
+                          dataKey="demi_journees"
+                          nameKey="code"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={85}
+                          innerRadius={40}
+                          paddingAngle={2}
+                        >
+                          {stats.codes_pointage.map((entry, index) => (
+                            <Cell
+                              key={index}
+                              fill={`hsl(${(index * 47 + 30) % 360}, 65%, 55%)`}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={<CustomTooltip unit="demi-j." />}
+                          formatter={(value, name) => [`${value} demi-j.`, name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="d-flex flex-wrap justify-content-center gap-2 mt-1">
+                      {stats.codes_pointage.map((cp, i) => (
+                        <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: 12 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: `hsl(${(i * 47 + 30) % 360}, 65%, 55%)`, display: 'inline-block', flexShrink: 0 }}></span>
+                          <span>{cp.code}</span>
+                          <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.demi_journees}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          )}
         </>
       )}
 
