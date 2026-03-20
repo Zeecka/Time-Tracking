@@ -77,6 +77,9 @@ const KpiCard = ({ title, value, subtitle, color, icon }) => (
   </Card>
 );
 
+// ── Couleur par index pour les codes pointage ─────────────────────────────────
+const getCodePointageColor = (index) => `hsl(${(index * 47 + 30) % 360}, 65%, 55%)`;
+
 // ── Composant principal ───────────────────────────────────────────────────────
 export default function Stats() {
   // Filters
@@ -737,7 +740,7 @@ export default function Stats() {
                           {stats.codes_pointage.map((entry, index) => (
                             <Cell
                               key={index}
-                              fill={`hsl(${(index * 47 + 30) % 360}, 65%, 55%)`}
+                              fill={getCodePointageColor(index)}
                             />
                           ))}
                         </Pie>
@@ -750,7 +753,7 @@ export default function Stats() {
                     <div className="d-flex flex-wrap justify-content-center gap-2 mt-1">
                       {stats.codes_pointage.map((cp, i) => (
                         <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: 12 }}>
-                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: `hsl(${(i * 47 + 30) % 360}, 65%, 55%)`, display: 'inline-block', flexShrink: 0 }}></span>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: getCodePointageColor(i), display: 'inline-block', flexShrink: 0 }}></span>
                           <span>{cp.code}</span>
                           <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.demi_journees}</Badge>
                         </div>
