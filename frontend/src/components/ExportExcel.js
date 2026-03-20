@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Form, Alert, Row, Col, Card, Table } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
-import { pointageAPI } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import { timeEntryAPI } from '../services/api';
 
 const getCurrentIsoWeekInfo = () => {
   const now = new Date();
@@ -38,8 +39,8 @@ const getIsoWeekDateRange = (year, week) => {
   return {
     monday,
     friday,
-    date_debut: monday.toISOString().split('T')[0],
-    date_fin: friday.toISOString().split('T')[0],
+    start_date: monday.toISOString().split('T')[0],
+    end_date: friday.toISOString().split('T')[0],
   };
 };
 
@@ -60,20 +61,20 @@ const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
   let days = diffDays;
 
   if (dateDebut === dateFin) {
-    if (periodeDebut === 'matin' && periodeFin === 'soir') {
+    if (periodeDebut === 'morning' && periodeFin === 'evening') {
       days = 1;
-    } else if (periodeDebut === 'matin' && periodeFin === 'midi') {
+    } else if (periodeDebut === 'morning' && periodeFin === 'midday') {
       days = 0.5;
-    } else if (periodeDebut === 'midi' && periodeFin === 'soir') {
+    } else if (periodeDebut === 'midday' && periodeFin === 'evening') {
       days = 0.5;
     } else {
       days = 0.5;
     }
   } else {
-    if (periodeDebut === 'midi') {
+    if (periodeDebut === 'midday') {
       days -= 0.5;
     }
-    if (periodeFin === 'midi') {
+    if (periodeFin === 'midday') {
       days += 0.5;
     } else {
       days += 1;
@@ -84,73 +85,73 @@ const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
 };
 
 const PERIODE_LABELS = {
-  matin: 'Matin',
-  midi: 'Midi',
-  soir: 'Soir',
+  morning: 'Morning',
+  midday: 'Midday',
+  evening: 'Evening',
   journee: 'Journée',
   apres_midi: 'Après-midi',
 };
 
 const EXPORT_COLUMNS = [
   {
-    id: 'annee',
-    label: 'Année',
+    id: 'year',
+    label: 'Year',
     width: 8,
-    getValue: (item) => item.annee,
+    getValue: (item) => item.year,
   },
   {
     id: 'semaine',
-    label: 'Semaine',
+    label: 'Week',
     width: 10,
-    getValue: (item) => item.numero_semaine,
+    getValue: (item) => item.week_number,
   },
   {
-    id: 'utilisateur',
-    label: 'Utilisateur',
+    id: 'user',
+    label: 'User',
     width: 20,
-    getValue: (item) => item.utilisateur?.nom || 'N/A',
+    getValue: (item) => item.user?.name || 'N/A',
   },
   {
-    id: 'projet',
-    label: 'Projet',
+    id: 'project',
+    label: 'Project',
     width: 30,
-    getValue: (item) => item.projet?.nom || 'N/A',
+    getValue: (item) => item.project?.name || 'N/A',
   },
   {
-    id: 'code_pointage',
-    label: 'Code Pointage',
+    id: 'tracking_code',
+    label: 'Tracking Code',
     width: 15,
-    getValue: (item) => item.projet?.code_pointage?.code || 'N/A',
+    getValue: (item) => item.project?.tracking_code?.code || 'N/A',
   },
   {
-    id: 'date_debut',
-    label: 'Date Début',
+    id: 'start_date',
+    label: 'Start Date',
     width: 12,
-    getValue: (item) => formatDateDDMMYYYY(item.date_debut),
+    getValue: (item) => formatDateDDMMYYYY(item.start_date),
   },
   {
-    id: 'periode_debut',
-    label: 'Période Début',
+    id: 'start_period',
+    label: 'Start Period',
     width: 15,
-    getValue: (item) => PERIODE_LABELS[item.periode_debut] || item.periode_debut,
+    getValue: (item) => PERIODE_LABELS[item.start_period] || item.start_period,
   },
   {
-    id: 'date_fin',
-    label: 'Date Fin',
+    id: 'end_date',
+    label: 'End Date',
     width: 12,
-    getValue: (item) => formatDateDDMMYYYY(item.date_fin),
+    getValue: (item) => formatDateDDMMYYYY(item.end_date),
   },
   {
-    id: 'periode_fin',
-    label: 'Période Fin',
+    id: 'end_period',
+    label: 'End Period',
     width: 15,
-    getValue: (item) => PERIODE_LABELS[item.periode_fin] || item.periode_fin,
+    getValue: (item) => PERIODE_LABELS[item.end_period] || item.end_period,
   },
   {
-    id: 'jours',
-    label: 'Jours',
+    id: 'days',
+    label: 'Days',
     width: 8,
-    getValue: (item) => calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin),
+    getValue: (item) => calculateDays(item.start_date, item.start_period, item.end_date, item.end_period),
   },
   {
     id: 'note',
@@ -168,18 +169,18 @@ const getDefaultSelectedColumns = () => EXPORT_COLUMNS.reduce((acc, column) => (
 const getActiveColumns = (selectedColumns) => EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]);
 
 const compareWeekYear = (left, right) => {
-  if (left.annee !== right.annee) {
-    return left.annee - right.annee;
+  if (left.year !== right.year) {
+    return left.year - right.year;
   }
-  return left.numero_semaine - right.numero_semaine;
+  return left.week_number - right.week_number;
 };
 
-const incrementWeekYear = ({ annee, numero_semaine }) => {
-  const maxWeeks = getIsoWeeksInYear(annee);
-  if (numero_semaine < maxWeeks) {
-    return { annee, numero_semaine: numero_semaine + 1 };
+const incrementWeekYear = ({ year, week_number }) => {
+  const maxWeeks = getIsoWeeksInYear(year);
+  if (week_number < maxWeeks) {
+    return { year, week_number: week_number + 1 };
   }
-  return { annee: annee + 1, numero_semaine: 1 };
+  return { year: year + 1, week_number: 1 };
 };
 
 const buildWeekRange = (start, end) => {
@@ -197,172 +198,173 @@ const buildWeekRange = (start, end) => {
 const sanitizeRangeFilters = (inputFilters) => {
   const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
 
-  const parsedStartYear = Number.isFinite(Number(inputFilters.start_annee))
-    ? parseInt(inputFilters.start_annee, 10)
+  const parsedStartYear = Number.isFinite(Number(inputFilters.start_year))
+    ? parseInt(inputFilters.start_year, 10)
     : CURRENT_WEEK_INFO.year;
-  const start_annee = Math.min(2100, Math.max(2000, parsedStartYear));
+  const start_year = Math.min(2100, Math.max(2000, parsedStartYear));
 
-  const parsedEndYear = Number.isFinite(Number(inputFilters.end_annee))
-    ? parseInt(inputFilters.end_annee, 10)
+  const parsedEndYear = Number.isFinite(Number(inputFilters.end_year))
+    ? parseInt(inputFilters.end_year, 10)
     : CURRENT_WEEK_INFO.year;
-  const end_annee = Math.min(2100, Math.max(2000, parsedEndYear));
+  const end_year = Math.min(2100, Math.max(2000, parsedEndYear));
 
-  const startMaxWeeks = getIsoWeeksInYear(start_annee);
-  const endMaxWeeks = getIsoWeeksInYear(end_annee);
+  const startMaxWeeks = getIsoWeeksInYear(start_year);
+  const endMaxWeeks = getIsoWeeksInYear(end_year);
 
-  const parsedStartWeek = Number.isFinite(Number(inputFilters.start_numero_semaine))
-    ? parseInt(inputFilters.start_numero_semaine, 10)
+  const parsedStartWeek = Number.isFinite(Number(inputFilters.start_week_number))
+    ? parseInt(inputFilters.start_week_number, 10)
     : CURRENT_WEEK_INFO.week;
-  const start_numero_semaine = Math.min(startMaxWeeks, Math.max(1, parsedStartWeek));
+  const start_week_number = Math.min(startMaxWeeks, Math.max(1, parsedStartWeek));
 
-  const parsedEndWeek = Number.isFinite(Number(inputFilters.end_numero_semaine))
-    ? parseInt(inputFilters.end_numero_semaine, 10)
+  const parsedEndWeek = Number.isFinite(Number(inputFilters.end_week_number))
+    ? parseInt(inputFilters.end_week_number, 10)
     : CURRENT_WEEK_INFO.week;
-  const end_numero_semaine = Math.min(endMaxWeeks, Math.max(1, parsedEndWeek));
+  const end_week_number = Math.min(endMaxWeeks, Math.max(1, parsedEndWeek));
 
-  const start = { annee: start_annee, numero_semaine: start_numero_semaine };
-  const end = { annee: end_annee, numero_semaine: end_numero_semaine };
+  const start = { year: start_year, week_number: start_week_number };
+  const end = { year: end_year, week_number: end_week_number };
 
   if (compareWeekYear(start, end) <= 0) {
     return {
-      start_annee,
-      start_numero_semaine,
-      end_annee,
-      end_numero_semaine,
+      start_year,
+      start_week_number,
+      end_year,
+      end_week_number,
     };
   }
 
   return {
-    start_annee: end_annee,
-    start_numero_semaine: end_numero_semaine,
-    end_annee: start_annee,
-    end_numero_semaine: start_numero_semaine,
+    start_year: end_year,
+    start_week_number: end_week_number,
+    end_year: start_year,
+    end_week_number: start_week_number,
   };
 };
 
-const formatWeekYearLabel = ({ annee, numero_semaine }) => `S${numero_semaine}-${annee}`;
+const formatWeekYearLabel = ({ year, week_number }) => `W${week_number}-${year}`;
 
-const buildStatsRows = (pointages, rangeLabel) => {
-  const totalJours = pointages.reduce((sum, item) => (
-    sum + calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin)
+const buildStatsRows = (timeEntries, rangeLabel) => {
+  const totalJours = timeEntries.reduce((sum, item) => (
+    sum + calculateDays(item.start_date, item.start_period, item.end_date, item.end_period)
   ), 0);
 
-  const utilisateursMap = {};
-  const projetsMap = {};
+  const usersMap = {};
+  const projectsMap = {};
 
-  pointages.forEach((item) => {
-    const jours = calculateDays(item.date_debut, item.periode_debut, item.date_fin, item.periode_fin);
+  timeEntries.forEach((item) => {
+    const jours = calculateDays(item.start_date, item.start_period, item.end_date, item.end_period);
 
-    const utilisateurNom = item.utilisateur?.nom || 'N/A';
-    if (!utilisateursMap[utilisateurNom]) {
-      utilisateursMap[utilisateurNom] = { jours: 0, pointages: 0 };
+    const userName = item.user?.name || 'N/A';
+    if (!usersMap[userName]) {
+      usersMap[userName] = { jours: 0, entries: 0 };
     }
-    utilisateursMap[utilisateurNom].jours += jours;
-    utilisateursMap[utilisateurNom].pointages += 1;
+    usersMap[userName].jours += jours;
+    usersMap[userName].entries += 1;
 
-    const projetNom = item.projet?.nom || 'N/A';
-    const codePointage = item.projet?.code_pointage?.code || 'N/A';
-    const projetKey = `${projetNom}__${codePointage}`;
-    if (!projetsMap[projetKey]) {
-      projetsMap[projetKey] = {
-        nom: projetNom,
-        code: codePointage,
+    const projectName = item.project?.name || 'N/A';
+    const trackingCode = item.project?.tracking_code?.code || 'N/A';
+    const projectKey = `${projectName}__${trackingCode}`;
+    if (!projectsMap[projectKey]) {
+      projectsMap[projectKey] = {
+        name: projectName,
+        code: trackingCode,
         jours: 0,
-        pointages: 0,
+        entries: 0,
       };
     }
-    projetsMap[projetKey].jours += jours;
-    projetsMap[projetKey].pointages += 1;
+    projectsMap[projectKey].jours += jours;
+    projectsMap[projectKey].entries += 1;
   });
 
-  const utilisateursRows = Object.entries(utilisateursMap)
-    .map(([nom, values]) => [nom, Number(values.jours.toFixed(2)), values.pointages])
+  const usersRows = Object.entries(usersMap)
+    .map(([name, values]) => [name, Number(values.jours.toFixed(2)), values.entries])
     .sort((left, right) => right[1] - left[1]);
 
-  const projetsRows = Object.values(projetsMap)
-    .map((projet) => [projet.nom, projet.code, Number(projet.jours.toFixed(2)), projet.pointages])
+  const projectsRows = Object.values(projectsMap)
+    .map((project) => [project.name, project.code, Number(project.jours.toFixed(2)), project.entries])
     .sort((left, right) => right[2] - left[2]);
 
   return [
-    ['Synthèse export'],
-    ['Période', rangeLabel],
-    ['Pointages exportés', pointages.length],
-    ['Total jours', Number(totalJours.toFixed(2))],
-    ['Utilisateurs uniques', Object.keys(utilisateursMap).length],
-    ['Projets uniques', Object.keys(projetsMap).length],
+    ['Export Summary'],
+    ['Period', rangeLabel],
+    ['Time entries exported', timeEntries.length],
+    ['Total days', Number(totalJours.toFixed(2))],
+    ['Unique users', Object.keys(usersMap).length],
+    ['Unique projects', Object.keys(projectsMap).length],
     [],
-    ['Répartition par utilisateur'],
-    ['Utilisateur', 'Jours', 'Pointages'],
-    ...utilisateursRows,
+    ['Breakdown by user'],
+    ['User', 'Days', 'Entries'],
+    ...usersRows,
     [],
-    ['Répartition par projet'],
-    ['Projet', 'Code Pointage', 'Jours', 'Pointages'],
-    ...projetsRows,
+    ['Breakdown by project'],
+    ['Project', 'Tracking Code', 'Days', 'Entries'],
+    ...projectsRows,
   ];
 };
 
 function ExportExcel() {
+  const { t } = useTranslation();
   const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
   const [filters, setFilters] = useState({
-    start_annee: CURRENT_WEEK_INFO.year,
-    start_numero_semaine: CURRENT_WEEK_INFO.week,
-    end_annee: CURRENT_WEEK_INFO.year,
-    end_numero_semaine: CURRENT_WEEK_INFO.week,
+    start_year: CURRENT_WEEK_INFO.year,
+    start_week_number: CURRENT_WEEK_INFO.week,
+    end_year: CURRENT_WEEK_INFO.year,
+    end_week_number: CURRENT_WEEK_INFO.week,
   });
-  const [pointages, setPointages] = useState([]);
+  const [timeEntries, setTimeEntries] = useState([]);
   const [selectedColumns, setSelectedColumns] = useState(getDefaultSelectedColumns);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  const loadPointages = useCallback(async (filterParams) => {
+  const loadTimeEntries = useCallback(async (filterParams) => {
     try {
       setLoading(true);
       const start = {
-        annee: filterParams.start_annee,
-        numero_semaine: filterParams.start_numero_semaine,
+        year: filterParams.start_year,
+        week_number: filterParams.start_week_number,
       };
       const end = {
-        annee: filterParams.end_annee,
-        numero_semaine: filterParams.end_numero_semaine,
+        year: filterParams.end_year,
+        week_number: filterParams.end_week_number,
       };
 
       const weeksToLoad = buildWeekRange(start, end);
       const responses = await Promise.all(
-        weeksToLoad.map((week) => pointageAPI.getAll({
-          annee: week.annee,
-          numero_semaine: week.numero_semaine,
+        weeksToLoad.map((week) => timeEntryAPI.getAll({
+          year: week.year,
+          week_number: week.week_number,
         })),
       );
 
       const merged = responses.flatMap((response) => response.data || []);
-      const uniquePointagesMap = new Map();
+      const uniqueTimeEntriesMap = new Map();
       merged.forEach((item) => {
-        uniquePointagesMap.set(item.id, item);
+        uniqueTimeEntriesMap.set(item.id, item);
       });
 
-      const sortedPointages = Array.from(uniquePointagesMap.values()).sort((left, right) => {
-        if (left.annee !== right.annee) return left.annee - right.annee;
-        if (left.numero_semaine !== right.numero_semaine) return left.numero_semaine - right.numero_semaine;
-        if (left.utilisateur?.nom !== right.utilisateur?.nom) {
-          return (left.utilisateur?.nom || '').localeCompare(right.utilisateur?.nom || '');
+      const sortedTimeEntries = Array.from(uniqueTimeEntriesMap.values()).sort((left, right) => {
+        if (left.year !== right.year) return left.year - right.year;
+        if (left.week_number !== right.week_number) return left.week_number - right.week_number;
+        if (left.user?.name !== right.user?.name) {
+          return (left.user?.name || '').localeCompare(right.user?.name || '');
         }
         return left.id - right.id;
       });
 
-      setPointages(sortedPointages);
+      setTimeEntries(sortedTimeEntries);
       setError('');
     } catch (err) {
-      setError('Erreur lors du chargement des pointages');
+      setError(t('timeEntry.errorLoad'));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    loadPointages(filters);
-  }, [filters, loadPointages]);
+    loadTimeEntries(filters);
+  }, [filters, loadTimeEntries]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -378,22 +380,21 @@ function ExportExcel() {
   };
 
   const handleExportExcel = () => {
-    if (pointages.length === 0) {
-      setError('Aucun pointage à exporter pour cette période');
+    if (timeEntries.length === 0) {
+      setError(t('timeEntry.noEntriesToExport'));
       return;
     }
 
     const activeColumns = getActiveColumns(selectedColumns);
     if (activeColumns.length === 0) {
-      setError('Sélectionnez au moins une colonne à exporter');
+      setError(t('grid.selectColumns'));
       return;
     }
 
     try {
       setExporting(true);
 
-      // Préparer les données pour Excel
-      const excelData = pointages.map((item) => {
+      const excelData = timeEntries.map((item) => {
         const row = {};
         activeColumns.forEach((column) => {
           row[column.label] = column.getValue(item);
@@ -401,49 +402,42 @@ function ExportExcel() {
         return row;
       });
 
-      // Créer le workbook et la feuille
       const wb = XLSX.utils.book_new();
-      const pointagesSheet = XLSX.utils.json_to_sheet(excelData);
-
-      // Ajuster la largeur des colonnes
-      pointagesSheet['!cols'] = activeColumns.map((column) => ({ wch: column.width }));
-
-      // Ajouter la feuille de pointages au workbook
-      XLSX.utils.book_append_sheet(wb, pointagesSheet, 'Pointages');
+      const timeEntriesSheet = XLSX.utils.json_to_sheet(excelData);
+      timeEntriesSheet['!cols'] = activeColumns.map((column) => ({ wch: column.width }));
+      XLSX.utils.book_append_sheet(wb, timeEntriesSheet, 'Time Entries');
 
       const statsRangeLabel = `${formatWeekYearLabel({
-        annee: filters.start_annee,
-        numero_semaine: filters.start_numero_semaine,
-      })} à ${formatWeekYearLabel({
-        annee: filters.end_annee,
-        numero_semaine: filters.end_numero_semaine,
+        year: filters.start_year,
+        week_number: filters.start_week_number,
+      })} to ${formatWeekYearLabel({
+        year: filters.end_year,
+        week_number: filters.end_week_number,
       })}`;
-      const statsRows = buildStatsRows(pointages, statsRangeLabel);
+      const statsRows = buildStatsRows(timeEntries, statsRangeLabel);
       const statsSheet = XLSX.utils.aoa_to_sheet(statsRows);
       statsSheet['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 12 }];
       XLSX.utils.book_append_sheet(wb, statsSheet, 'Stats');
-
-      // Générer et télécharger le fichier
-      const fileName = `pointages_${filters.start_annee}_S${filters.start_numero_semaine}_a_${filters.end_annee}_S${filters.end_numero_semaine}.xlsx`;
+      const fileName = `time_entries_${filters.start_year}_W${filters.start_week_number}_to_${filters.end_year}_W${filters.end_week_number}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
       setError('');
     } catch (err) {
-      setError('Erreur lors de l\'export Excel');
+      setError(t('export.errorExport'));
       console.error(err);
     } finally {
       setExporting(false);
     }
   };
 
-  const startWeekRange = getIsoWeekDateRange(filters.start_annee, filters.start_numero_semaine);
-  const endWeekRange = getIsoWeekDateRange(filters.end_annee, filters.end_numero_semaine);
-  const formatFrenchShortDate = (date) => new Intl.DateTimeFormat('fr-FR', {
+  const startWeekRange = getIsoWeekDateRange(filters.start_year, filters.start_week_number);
+  const endWeekRange = getIsoWeekDateRange(filters.end_year, filters.end_week_number);
+  const formatShortDate = (date) => new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'long',
     timeZone: 'UTC',
   }).format(date);
-  const selectedWeekLabel = `Du lundi ${formatFrenchShortDate(startWeekRange.monday)} ${filters.start_annee} au vendredi ${formatFrenchShortDate(endWeekRange.friday)} ${filters.end_annee}`;
+  const selectedWeekLabel = `Mon ${formatShortDate(startWeekRange.monday)} ${filters.start_year} – Fri ${formatShortDate(endWeekRange.friday)} ${filters.end_year}`;
   const selectedColumnCount = EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]).length;
   const previewColumns = getActiveColumns(selectedColumns);
 
@@ -460,17 +454,17 @@ function ExportExcel() {
 
       <Card className="mb-4">
         <Card.Header>
-          <h5 className="mb-0">Sélection de la période</h5>
+          <h5 className="mb-0">{t('export.selectPeriod') || 'Select period'}</h5>
         </Card.Header>
         <Card.Body>
           <Row className="mb-3">
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Année début</Form.Label>
+                <Form.Label>{t('export.startYear') || 'Start year'}</Form.Label>
                 <Form.Control
                   type="number"
-                  name="start_annee"
-                  value={Number.isFinite(filters.start_annee) ? filters.start_annee : ''}
+                  name="start_year"
+                  value={Number.isFinite(filters.start_year) ? filters.start_year : ''}
                   onChange={handleFilterChange}
                   min="2000"
                   max="2100"
@@ -479,11 +473,11 @@ function ExportExcel() {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Semaine début</Form.Label>
+                <Form.Label>{t('export.startWeek') || 'Start week'}</Form.Label>
                 <Form.Control
                   type="number"
-                  name="start_numero_semaine"
-                  value={Number.isFinite(filters.start_numero_semaine) ? filters.start_numero_semaine : ''}
+                  name="start_week_number"
+                  value={Number.isFinite(filters.start_week_number) ? filters.start_week_number : ''}
                   onChange={handleFilterChange}
                   min="1"
                   max="53"
@@ -492,11 +486,11 @@ function ExportExcel() {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Année fin</Form.Label>
+                <Form.Label>{t('export.endYear') || 'End year'}</Form.Label>
                 <Form.Control
                   type="number"
-                  name="end_annee"
-                  value={Number.isFinite(filters.end_annee) ? filters.end_annee : ''}
+                  name="end_year"
+                  value={Number.isFinite(filters.end_year) ? filters.end_year : ''}
                   onChange={handleFilterChange}
                   min="2000"
                   max="2100"
@@ -505,11 +499,11 @@ function ExportExcel() {
             </Col>
             <Col md={3}>
               <Form.Group>
-                <Form.Label>Semaine fin</Form.Label>
+                <Form.Label>{t('export.endWeek') || 'End week'}</Form.Label>
                 <Form.Control
                   type="number"
-                  name="end_numero_semaine"
-                  value={Number.isFinite(filters.end_numero_semaine) ? filters.end_numero_semaine : ''}
+                  name="end_week_number"
+                  value={Number.isFinite(filters.end_week_number) ? filters.end_week_number : ''}
                   onChange={handleFilterChange}
                   min="1"
                   max="53"
@@ -527,7 +521,7 @@ function ExportExcel() {
 
       <Card className="mb-4">
         <Card.Header>
-          <h5 className="mb-0">Colonnes à exporter</h5>
+          <h5 className="mb-0">{t('export.selectColumns')}</h5>
         </Card.Header>
         <Card.Body>
           <Row>
@@ -544,40 +538,40 @@ function ExportExcel() {
             ))}
           </Row>
           <div className="text-muted mt-2">
-            {selectedColumnCount} colonne(s) sélectionnée(s)
+            {selectedColumnCount} {t('export.columnsSelected') || 'column(s) selected'}
           </div>
         </Card.Body>
       </Card>
 
       <Card className="mb-4">
         <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Aperçu des données</h5>
+          <h5 className="mb-0">{t('export.dataPreview') || 'Data preview'}</h5>
           <Button
             variant="success"
             onClick={handleExportExcel}
-            disabled={loading || exporting || pointages.length === 0}
+            disabled={loading || exporting || timeEntries.length === 0}
           >
             <i className="fas fa-file-excel me-2"></i>
-            {exporting ? 'Export en cours...' : 'Exporter vers Excel'}
+            {exporting ? (t('export.exporting') || 'Exporting...') : t('export.export')}
           </Button>
         </Card.Header>
         <Card.Body>
           {loading ? (
-            <p>Chargement...</p>
-          ) : pointages.length === 0 ? (
-            <Alert variant="info">Aucun pointage trouvé pour la période sélectionnée</Alert>
+            <p>{t('common.loading')}</p>
+          ) : timeEntries.length === 0 ? (
+            <Alert variant="info">{t('common.noData')}</Alert>
           ) : (
             <>
               <p className="mb-3">
-                <strong>{pointages.length}</strong>
+                <strong>{timeEntries.length}</strong>
                 {' '}
-                pointage(s) trouvé(s) de
+                {t('timeEntry.entriesFound') || 'time entr(y/ies) found from'}
                 {' '}
-                {formatWeekYearLabel({ annee: filters.start_annee, numero_semaine: filters.start_numero_semaine })}
+                {formatWeekYearLabel({ year: filters.start_year, week_number: filters.start_week_number })}
                 {' '}
-                à
+                {t('common.to') || 'to'}
                 {' '}
-                {formatWeekYearLabel({ annee: filters.end_annee, numero_semaine: filters.end_numero_semaine })}
+                {formatWeekYearLabel({ year: filters.end_year, week_number: filters.end_week_number })}
               </p>
               <Table striped bordered hover responsive>
                 <thead>
@@ -588,7 +582,7 @@ function ExportExcel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pointages.slice(0, 10).map((item) => (
+                  {timeEntries.slice(0, 10).map((item) => (
                     <tr key={item.id}>
                       {previewColumns.map((column) => {
                         const value = column.getValue(item);
@@ -602,9 +596,9 @@ function ExportExcel() {
                   ))}
                 </tbody>
               </Table>
-              {pointages.length > 10 && (
+              {timeEntries.length > 10 && (
                 <p className="text-muted text-center mt-2">
-                  ... et {pointages.length - 10} autre(s) pointage(s)
+                  ... {t('common.andMore') || 'and'} {timeEntries.length - 10} {t('common.moreEntries') || 'more time entr(y/ies)'}
                 </p>
               )}
             </>

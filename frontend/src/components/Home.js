@@ -1,18 +1,20 @@
 import React from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 
 function Home() {
+  const { t } = useTranslation();
+
   return (
     <Container>
       <Row className="my-5">
         <Col>
           <h1 style={{ fontWeight: 700 }}>
             <i className="fas fa-business-time me-2" style={{ color: '#3498db' }}></i>
-            Application de Pointage
+            {t('home.title')}
           </h1>
           <p className="lead">
-            Bienvenue dans l'application de gestion de pointage. Cette application vous permet de gérer
-            vos codes de pointage, projets, utilisateurs et saisies de temps.
+            {t('home.description')}
           </p>
         </Col>
       </Row>
@@ -21,9 +23,9 @@ function Home() {
         <Col md={6}>
           <Card>
             <Card.Body>
-              <Card.Title>Pointages</Card.Title>
+              <Card.Title>{t('home.features.tracking')}</Card.Title>
               <Card.Text>
-                Saisissez et gérez vos heures de travail par projet et par semaine.
+                {t('home.features.trackingDesc')}
               </Card.Text>
             </Card.Body>
           </Card>
@@ -32,9 +34,9 @@ function Home() {
         <Col md={6}>
           <Card>
             <Card.Body>
-              <Card.Title>Projets</Card.Title>
+              <Card.Title>{t('nav.projects')}</Card.Title>
               <Card.Text>
-                Gérez vos projets et associez-les à des codes de pointage.
+                {t('project.title')}
               </Card.Text>
             </Card.Body>
           </Card>
@@ -43,9 +45,9 @@ function Home() {
         <Col md={6}>
           <Card>
             <Card.Body>
-              <Card.Title>Codes Pointage</Card.Title>
+              <Card.Title>{t('nav.trackingCodes')}</Card.Title>
               <Card.Text>
-                Créez et gérez les codes de pointage utilisés pour catégoriser vos projets.
+                {t('trackingCode.title')}
               </Card.Text>
             </Card.Body>
           </Card>
@@ -54,9 +56,9 @@ function Home() {
         <Col md={6}>
           <Card>
             <Card.Body>
-              <Card.Title>Utilisateurs</Card.Title>
+              <Card.Title>{t('nav.users')}</Card.Title>
               <Card.Text>
-                Gérez les utilisateurs de l'application avec leurs couleurs d'identification.
+                {t('user.title')}
               </Card.Text>
             </Card.Body>
           </Card>
