@@ -134,6 +134,8 @@ Toute la documentation de développement (setup, seed, exécution locale, type-c
 - [ ] Soft delete pour l'historique
 - [ ] API de recherche full-text
 - [ ] Notifications et rappels
+- [ ] Ajout d'une fonctionnalité d'export/import COMPLET de la DB
+- [ ] Conversion du repos en anglais avec support i18n
 
 ## Licence
 
