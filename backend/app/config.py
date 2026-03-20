@@ -31,10 +31,12 @@ class Config:
         "max_age": 3600,
     }
 
-    # Stats configuration: comma-separated list of project names to exclude from TOP Projets
-    STATS_EXCLUDE_PROJETS_STR = os.environ.get("STATS_EXCLUDE_PROJETS", "")
-    STATS_EXCLUDE_PROJETS = [
-        name.strip() for name in STATS_EXCLUDE_PROJETS_STR.split(",") if name.strip()
+    # Stats configuration: comma-separated list of project names to exclude from top projects
+    STATS_EXCLUDE_PROJECTS_STR = os.environ.get("STATS_EXCLUDE_PROJECTS", "")
+    STATS_EXCLUDE_PROJECTS = [
+        name.strip()
+        for name in STATS_EXCLUDE_PROJECTS_STR.split(",")
+        if name.strip()
     ]
 
 

@@ -9,70 +9,70 @@ const api = axios.create({
   },
 });
 
-// Code Pointage API
-export const codePointageAPI = {
-  getAll: () => api.get('/code-pointage'),
-  getById: (id) => api.get(`/code-pointage/${id}`),
-  create: (data) => api.post('/code-pointage', data),
-  update: (id, data) => api.put(`/code-pointage/${id}`, data),
-  delete: (id) => api.delete(`/code-pointage/${id}`),
-  exportCSV: () => api.get('/code-pointage/export-csv', { responseType: 'blob' }),
+// Tracking Code API
+export const trackingCodeAPI = {
+  getAll: () => api.get('/tracking-codes'),
+  getById: (id) => api.get(`/tracking-codes/${id}`),
+  create: (data) => api.post('/tracking-codes', data),
+  update: (id, data) => api.put(`/tracking-codes/${id}`, data),
+  delete: (id) => api.delete(`/tracking-codes/${id}`),
+  exportCSV: () => api.get('/tracking-codes/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/code-pointage/import-csv', formData, {
+    return api.post('/tracking-codes/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 };
 
-// Projet API
-export const projetAPI = {
-  getAll: () => api.get('/projets'),
-  getById: (id) => api.get(`/projets/${id}`),
-  create: (data) => api.post('/projets', data),
-  update: (id, data) => api.put(`/projets/${id}`, data),
-  delete: (id) => api.delete(`/projets/${id}`),
-  exportCSV: () => api.get('/projets/export-csv', { responseType: 'blob' }),
+// Project API
+export const projectAPI = {
+  getAll: () => api.get('/projects'),
+  getById: (id) => api.get(`/projects/${id}`),
+  create: (data) => api.post('/projects', data),
+  update: (id, data) => api.put(`/projects/${id}`, data),
+  delete: (id) => api.delete(`/projects/${id}`),
+  exportCSV: () => api.get('/projects/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/projets/import-csv', formData, {
+    return api.post('/projects/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 };
 
-// Utilisateur API
-export const utilisateurAPI = {
-  getAll: () => api.get('/utilisateurs'),
-  getById: (id) => api.get(`/utilisateurs/${id}`),
-  create: (data) => api.post('/utilisateurs', data),
-  update: (id, data) => api.put(`/utilisateurs/${id}`, data),
-  delete: (id) => api.delete(`/utilisateurs/${id}`),
-  exportCSV: () => api.get('/utilisateurs/export-csv', { responseType: 'blob' }),
+// User API
+export const userAPI = {
+  getAll: () => api.get('/users'),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  exportCSV: () => api.get('/users/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/utilisateurs/import-csv', formData, {
+    return api.post('/users/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 };
 
-// Pointage API
-export const pointageAPI = {
-  getAll: (params) => api.get('/pointages', { params }),
-  getById: (id) => api.get(`/pointages/${id}`),
-  create: (data) => api.post('/pointages', data),
-  update: (id, data) => api.put(`/pointages/${id}`, data),
-  delete: (id) => api.delete(`/pointages/${id}`),
-  bulkCreate: (data) => api.post('/pointages/bulk', data),
-  exportCSV: (params) => api.get('/pointages/export-csv', { params, responseType: 'blob' }),
+// Time Entry API
+export const timeEntryAPI = {
+  getAll: (params) => api.get('/time-entries', { params }),
+  getById: (id) => api.get(`/time-entries/${id}`),
+  create: (data) => api.post('/time-entries', data),
+  update: (id, data) => api.put(`/time-entries/${id}`, data),
+  delete: (id) => api.delete(`/time-entries/${id}`),
+  bulkCreate: (data) => api.post('/time-entries/bulk', data),
+  exportCSV: (params) => api.get('/time-entries/export-csv', { params, responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/pointages/import-csv', formData, {
+    return api.post('/time-entries/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

@@ -9,7 +9,7 @@ function) to guarantee full isolation without needing nested transactions.
 import pytest
 from app import create_app
 from app.extensions import db as _db
-from app.models import CodePointage, Projet, Utilisateur
+from app.models import Project, TrackingCode, User
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +43,7 @@ def client(app, db):
 
 @pytest.fixture()
 def code_dev(db):
-    code = CodePointage(code="DEV")
+    code = TrackingCode(code="DEV")
     db.session.add(code)
     db.session.flush()
     return code
@@ -51,62 +51,62 @@ def code_dev(db):
 
 @pytest.fixture()
 def code_abs(db):
-    code = CodePointage(code="ABS")
+    code = TrackingCode(code="ABS")
     db.session.add(code)
     db.session.flush()
     return code
 
 
 @pytest.fixture()
-def projet_dev(db, code_dev):
-    projet = Projet(
-        nom="Développement",
-        couleur="#3498db",
-        motif="uni",
-        code_pointage_id=code_dev.id,
+def project_dev(db, code_dev):
+    project = Project(
+        name="Development",
+        color="#3498db",
+        pattern="solid",
+        tracking_code_id=code_dev.id,
     )
-    db.session.add(projet)
+    db.session.add(project)
     db.session.flush()
-    return projet
+    return project
 
 
 @pytest.fixture()
-def projet_bug(db, code_dev):
-    projet = Projet(
-        nom="Bug Fix",
-        couleur="#e74c3c",
-        motif="raye",
-        code_pointage_id=code_dev.id,
+def project_bug(db, code_dev):
+    project = Project(
+        name="Bug Fix",
+        color="#e74c3c",
+        pattern="striped",
+        tracking_code_id=code_dev.id,
     )
-    db.session.add(projet)
+    db.session.add(project)
     db.session.flush()
-    return projet
+    return project
 
 
 @pytest.fixture()
-def projet_abs(db, code_abs):
-    projet = Projet(
-        nom="Absence",
-        couleur="#95a5a6",
-        motif="pointille",
-        code_pointage_id=code_abs.id,
+def project_abs(db, code_abs):
+    project = Project(
+        name="Absence",
+        color="#95a5a6",
+        pattern="dotted",
+        tracking_code_id=code_abs.id,
     )
-    db.session.add(projet)
+    db.session.add(project)
     db.session.flush()
-    return projet
+    return project
 
 
 @pytest.fixture()
-def utilisateur_alice(db):
-    u = Utilisateur(nom="Alice", couleur="#2ecc71")
+def user_alice(db):
+    u = User(name="Alice", color="#2ecc71")
     db.session.add(u)
     db.session.flush()
     return u
 
 
 @pytest.fixture()
-def utilisateur_bob(db):
-    u = Utilisateur(nom="Bob", couleur="#9b59b6")
+def user_bob(db):
+    u = User(name="Bob", color="#9b59b6")
     db.session.add(u)
     db.session.flush()
     return u

@@ -1,72 +1,72 @@
 from datetime import date, timedelta
 
 from app.extensions import db
-from app.models import CodePointage, Pointage, Projet, Utilisateur
+from app.models import Project, TimeEntry, TrackingCode, User
 
 # ---------------------------------------------------------------------------
 # Upsert helpers
 # ---------------------------------------------------------------------------
 
 
-def _upsert_code_pointage(code):
-    item = CodePointage.query.filter_by(code=code).first()
+def _upsert_tracking_code(code):
+    item = TrackingCode.query.filter_by(code=code).first()
     if item:
         return item
-    item = CodePointage(code=code)
+    item = TrackingCode(code=code)
     db.session.add(item)
     return item
 
 
-def _upsert_projet(nom, couleur, motif, code_pointage):
-    item = Projet.query.filter_by(nom=nom).first()
+def _upsert_project(name, color, pattern, tracking_code):
+    item = Project.query.filter_by(name=name).first()
     if item:
-        item.couleur = couleur
-        item.motif = motif
-        item.code_pointage = code_pointage
+        item.color = color
+        item.pattern = pattern
+        item.tracking_code = tracking_code
         return item
-    item = Projet(nom=nom, couleur=couleur, motif=motif, code_pointage=code_pointage)
+    item = Project(name=name, color=color, pattern=pattern, tracking_code=tracking_code)
     db.session.add(item)
     return item
 
 
-def _upsert_utilisateur(nom, couleur, sub=None):
-    item = Utilisateur.query.filter_by(nom=nom).first()
+def _upsert_user(name, color, sub=None):
+    item = User.query.filter_by(name=name).first()
     if item:
-        item.couleur = couleur
+        item.color = color
         if sub is not None:
             item.sub = sub
         return item
-    item = Utilisateur(nom=nom, couleur=couleur, sub=sub)
+    item = User(name=name, color=color, sub=sub)
     db.session.add(item)
     return item
 
 
 # ---------------------------------------------------------------------------
-# Pointage creation helper
+# Time entry creation helper
 # ---------------------------------------------------------------------------
 
 
-def _add_pointage(user, projet, monday, d_start, p_start, d_end, p_end, note=None):
+def _add_time_entry(user, project, monday, d_start, p_start, d_end, p_end, note=None):
     """
-    Add a Pointage directly to the session.
+    Add a TimeEntry directly to the session.
 
     d_start / d_end : integer offsets from monday (0=Mon ... 4=Fri).
-    p_start         : 'matin' | 'midi'
-    p_end           : 'midi'  | 'soir'
+    p_start         : 'morning' | 'midday'
+    p_end           : 'midday'  | 'evening'
     """
-    date_debut = monday + timedelta(days=d_start)
-    date_fin = monday + timedelta(days=d_end)
-    year, week, _ = date_debut.isocalendar()
+    start_date = monday + timedelta(days=d_start)
+    end_date = monday + timedelta(days=d_end)
+    year, week, _ = start_date.isocalendar()
     db.session.add(
-        Pointage(
-            date_debut=date_debut,
-            periode_debut=p_start,
-            date_fin=date_fin,
-            periode_fin=p_end,
-            numero_semaine=week,
-            annee=year,
-            utilisateur_id=user.id,
-            projet_id=projet.id,
+        TimeEntry(
+            start_date=start_date,
+            start_period=p_start,
+            end_date=end_date,
+            end_period=p_end,
+            week_number=week,
+            year=year,
+            user_id=user.id,
+            project_id=project.id,
             note=note,
         )
     )
@@ -78,355 +78,305 @@ def _add_pointage(user, projet, monday, d_start, p_start, d_end, p_end, note=Non
 
 
 def seed_dev_data():
-    existing_pointages = Pointage.query.count()
+    existing_entries = TimeEntry.query.count()
 
     # ------------------------------------------------------------------
-    # 1. Codes de pointage
-    #    Every active category + one archived code with no projects
-    #    (allows testing DELETE /api/code-pointages/:id without 409).
+    # 1. Tracking codes
     # ------------------------------------------------------------------
     codes = {
-        "DEV": _upsert_code_pointage("DEV"),
-        "BUG": _upsert_code_pointage("BUG"),
-        "DOC": _upsert_code_pointage("DOC"),
-        "RUN": _upsert_code_pointage("RUN"),
-        "MEET": _upsert_code_pointage("MEET"),
-        "ABS": _upsert_code_pointage("ABS"),
-        # Code archivé sans projet — teste la suppression sans conflit 409
-        "ARCV": _upsert_code_pointage("ARCV"),
+        "DEV": _upsert_tracking_code("DEV"),
+        "BUG": _upsert_tracking_code("BUG"),
+        "DOC": _upsert_tracking_code("DOC"),
+        "RUN": _upsert_tracking_code("RUN"),
+        "MEET": _upsert_tracking_code("MEET"),
+        "ABS": _upsert_tracking_code("ABS"),
+        # Archived code without project — tests deletion without 409 conflict
+        "ARCV": _upsert_tracking_code("ARCV"),
     }
 
     # ------------------------------------------------------------------
-    # 2. Projets   (couvre les 3 motifs : uni / raye / pointille)
-    #    "Veille Technologique" n'a aucun pointage → teste l'UI vide.
+    # 2. Projects (covers all 3 patterns: solid / striped / dotted)
     # ------------------------------------------------------------------
-    projets = [
-        # idx 0  — motif uni
-        _upsert_projet("Portail Client", "#0d6efd", "uni", codes["DEV"]),
-        # idx 1  — motif pointille
-        _upsert_projet("API Facturation", "#20c997", "pointille", codes["BUG"]),
-        # idx 2  — motif pointille
-        _upsert_projet("Application Mobile", "#6f42c1", "pointille", codes["DEV"]),
-        # idx 3  — motif uni
-        _upsert_projet("Refonte UI", "#fd7e14", "uni", codes["DOC"]),
-        # idx 4  — motif uni
-        _upsert_projet("Infra CI/CD", "#198754", "uni", codes["RUN"]),
-        # idx 5  — motif pointille
-        _upsert_projet("Rituels Equipe", "#dc3545", "pointille", codes["MEET"]),
-        # idx 6  — motif raye (absence)
-        _upsert_projet("Jour Ferie", "#6c757d", "raye", codes["ABS"]),
-        # idx 7  — motif raye (absence)
-        _upsert_projet("RTT", "#ffc107", "raye", codes["ABS"]),
-        # idx 8  — motif raye (absence)
-        _upsert_projet("Arret Maladie", "#e83e8c", "raye", codes["ABS"]),
-        # idx 9  — motif uni
-        _upsert_projet("Formation Azure", "#17a2b8", "uni", codes["DOC"]),
-        # idx 10 — motif uni — AUCUN pointage : teste l'affichage d'un projet vide
-        _upsert_projet("Veille Technologique", "#0dcaf0", "uni", codes["DOC"]),
+    projects = [
+        # idx 0  — solid
+        _upsert_project("Client Portal", "#0d6efd", "solid", codes["DEV"]),
+        # idx 1  — dotted
+        _upsert_project("Billing API", "#20c997", "dotted", codes["BUG"]),
+        # idx 2  — dotted
+        _upsert_project("Mobile App", "#6f42c1", "dotted", codes["DEV"]),
+        # idx 3  — solid
+        _upsert_project("UI Redesign", "#fd7e14", "solid", codes["DOC"]),
+        # idx 4  — solid
+        _upsert_project("CI/CD Infra", "#198754", "solid", codes["RUN"]),
+        # idx 5  — dotted
+        _upsert_project("Team Rituals", "#dc3545", "dotted", codes["MEET"]),
+        # idx 6  — striped (absence)
+        _upsert_project("Public Holiday", "#6c757d", "striped", codes["ABS"]),
+        # idx 7  — striped (absence)
+        _upsert_project("RTT", "#ffc107", "striped", codes["ABS"]),
+        # idx 8  — striped (absence)
+        _upsert_project("Sick Leave", "#e83e8c", "striped", codes["ABS"]),
+        # idx 9  — solid
+        _upsert_project("Azure Training", "#17a2b8", "solid", codes["DOC"]),
+        # idx 10 — solid — NO time entries: tests empty project display
+        _upsert_project("Tech Watch", "#0dcaf0", "solid", codes["DOC"]),
     ]
 
-    PC = projets[0]  # Portail Client
-    AF = projets[1]  # API Facturation
-    AM = projets[2]  # Application Mobile
-    RUI = projets[3]  # Refonte UI
-    INF = projets[4]  # Infra CI/CD
-    RE = projets[5]  # Rituels Equipe
-    JF = projets[6]  # Jour Ferie
-    RTT = projets[7]  # RTT
-    ABS = projets[8]  # Arret Maladie
-    FA = projets[9]  # Formation Azure
+    CP = projects[0]   # Client Portal
+    BA = projects[1]   # Billing API
+    MA = projects[2]   # Mobile App
+    UIR = projects[3]  # UI Redesign
+    INF = projects[4]  # CI/CD Infra
+    TR = projects[5]   # Team Rituals
+    PH = projects[6]   # Public Holiday
+    RTT = projects[7]  # RTT
+    SL = projects[8]   # Sick Leave
+    AT = projects[9]   # Azure Training
 
     # ------------------------------------------------------------------
-    # 3. Utilisateurs
-    #    5 users ; Camille possede un OIDC sub pour tester la contrainte
-    #    d'unicite du sub et la route PUT utilisateur.
+    # 3. Users (5 users; Camille has an OIDC sub to test uniqueness)
     # ------------------------------------------------------------------
-    utilisateurs = [
-        _upsert_utilisateur("Alice Martin", "#3b82f6"),
-        _upsert_utilisateur("Yassine Benali", "#14b8a6"),
-        _upsert_utilisateur("Sophie Leroy", "#a855f7"),
-        _upsert_utilisateur("Thomas Bernard", "#f59e0b"),
-        _upsert_utilisateur("Camille Dupont", "#ef4444", sub="oidc-sub-camille-001"),
+    users = [
+        _upsert_user("Alice Martin", "#3b82f6"),
+        _upsert_user("Yassine Benali", "#14b8a6"),
+        _upsert_user("Sophie Leroy", "#a855f7"),
+        _upsert_user("Thomas Bernard", "#f59e0b"),
+        _upsert_user("Camille Dupont", "#ef4444", sub="oidc-sub-camille-001"),
     ]
 
-    ALICE = utilisateurs[0]
-    YASSINE = utilisateurs[1]
-    SOPHIE = utilisateurs[2]
-    THOMAS = utilisateurs[3]
-    CAMILLE = utilisateurs[4]
+    ALICE = users[0]
+    YASSINE = users[1]
+    SOPHIE = users[2]
+    THOMAS = users[3]
+    CAMILLE = users[4]
 
     db.session.flush()
 
     # ------------------------------------------------------------------
-    # 4. Pointages — crees uniquement si la table est vide
+    # 4. Time entries — created only if the table is empty
     # ------------------------------------------------------------------
-    if existing_pointages == 0:
+    if existing_entries == 0:
         today = date.today()
         current_monday = today - timedelta(days=today.weekday())
 
-        # Alias court
         def P(user, proj, monday, ds, ps, de, pe, note=None):
-            _add_pointage(user, proj, monday, ds, ps, de, pe, note)
+            _add_time_entry(user, proj, monday, ds, ps, de, pe, note)
 
         # --------------------------------------------------------------
-        # Semaine -3  (il y a trois semaines)
-        # Couverture:
-        #   - Entrees full-day (matin -> soir)
-        #   - Blocs multi-jours (ex: mar -> mer)
-        #   - Demi-journee matin (matin -> midi)
-        #   - Demi-journee apres-midi (midi -> soir)
-        #   - Tous les projets non-absence utilises
-        #   - Note sur une entree Thomas
+        # Week -3
         # --------------------------------------------------------------
         w = current_monday + timedelta(weeks=-3)
 
-        # Alice : lun full | mar-mer multi-jours | jeu matin + apres-midi | ven full
-        P(ALICE, PC, w, 0, "matin", 0, "soir")
-        P(ALICE, AF, w, 1, "matin", 2, "soir")  # multi-jours mar->mer
-        P(ALICE, RE, w, 3, "matin", 3, "midi")  # jeu matin
-        P(ALICE, FA, w, 3, "midi", 3, "soir")  # jeu apres-midi
-        P(ALICE, INF, w, 4, "matin", 4, "soir")
+        P(ALICE, CP, w, 0, "morning", 0, "evening")
+        P(ALICE, BA, w, 1, "morning", 2, "evening")
+        P(ALICE, TR, w, 3, "morning", 3, "midday")
+        P(ALICE, AT, w, 3, "midday", 3, "evening")
+        P(ALICE, INF, w, 4, "morning", 4, "evening")
 
-        # Yassine : lun-mar multi-jours | mer full | jeu matin + apres-midi | ven full
-        P(YASSINE, AM, w, 0, "matin", 1, "soir")  # multi-jours lun->mar
-        P(YASSINE, PC, w, 2, "matin", 2, "soir")
-        P(YASSINE, AF, w, 3, "matin", 3, "midi")
-        P(YASSINE, RE, w, 3, "midi", 3, "soir")
-        P(YASSINE, RUI, w, 4, "matin", 4, "soir")
+        P(YASSINE, MA, w, 0, "morning", 1, "evening")
+        P(YASSINE, CP, w, 2, "morning", 2, "evening")
+        P(YASSINE, BA, w, 3, "morning", 3, "midday")
+        P(YASSINE, TR, w, 3, "midday", 3, "evening")
+        P(YASSINE, UIR, w, 4, "morning", 4, "evening")
 
-        # Sophie : lun matin + apres-midi | mar-jeu multi-jours | ven matin + apres-midi
-        P(SOPHIE, RE, w, 0, "matin", 0, "midi")
-        P(SOPHIE, PC, w, 0, "midi", 0, "soir")
-        P(SOPHIE, RUI, w, 1, "matin", 3, "soir")  # multi-jours mar->jeu
-        P(SOPHIE, FA, w, 4, "matin", 4, "midi")
-        P(SOPHIE, INF, w, 4, "midi", 4, "soir")
+        P(SOPHIE, TR, w, 0, "morning", 0, "midday")
+        P(SOPHIE, CP, w, 0, "midday", 0, "evening")
+        P(SOPHIE, UIR, w, 1, "morning", 3, "evening")
+        P(SOPHIE, AT, w, 4, "morning", 4, "midday")
+        P(SOPHIE, INF, w, 4, "midday", 4, "evening")
 
-        # Thomas : lun-mer multi-jours | jeu full (avec note) | ven full
-        P(THOMAS, PC, w, 0, "matin", 2, "soir")  # multi-jours lun->mer
+        P(THOMAS, CP, w, 0, "morning", 2, "evening")
         P(
             THOMAS,
-            AF,
+            BA,
             w,
             3,
-            "matin",
+            "morning",
             3,
-            "soir",
-            "Correction bug critique -- perte de donnees en production",
+            "evening",
+            "Critical bug fix -- data loss in production",
         )
-        P(THOMAS, AM, w, 4, "matin", 4, "soir")
+        P(THOMAS, MA, w, 4, "morning", 4, "evening")
 
-        # Camille : lun full (note) | mar full | mer matin + apres-midi | jeu-ven multi-jours
         P(
             CAMILLE,
-            FA,
+            AT,
             w,
             0,
-            "matin",
+            "morning",
             0,
-            "soir",
-            "Formation initiale Azure Fundamentals (AZ-900)",
+            "evening",
+            "Initial Azure Fundamentals training (AZ-900)",
         )
-        P(CAMILLE, PC, w, 1, "matin", 1, "soir")
-        P(CAMILLE, AM, w, 2, "matin", 2, "midi")
-        P(CAMILLE, RE, w, 2, "midi", 2, "soir")
-        P(CAMILLE, INF, w, 3, "matin", 4, "soir")  # multi-jours jeu->ven
+        P(CAMILLE, CP, w, 1, "morning", 1, "evening")
+        P(CAMILLE, MA, w, 2, "morning", 2, "midday")
+        P(CAMILLE, TR, w, 2, "midday", 2, "evening")
+        P(CAMILLE, INF, w, 3, "morning", 4, "evening")
 
         # --------------------------------------------------------------
-        # Semaine -2
-        # Couverture:
-        #   - Entree debutant un apres-midi et finissant le jour suivant
-        #     (chevauchement midi inter-jours : lun PM -> mar soir)
-        #   - Bloc lun->jeu (4 jours) pour Sophie
+        # Week -2
         # --------------------------------------------------------------
         w = current_monday + timedelta(weeks=-2)
 
-        # Alice : lun-mar multi-jours | mer matin + apres-midi | jeu-ven multi-jours
-        P(ALICE, AM, w, 0, "matin", 1, "soir")
-        P(ALICE, RE, w, 2, "matin", 2, "midi")
-        P(ALICE, PC, w, 2, "midi", 2, "soir")
-        P(ALICE, RUI, w, 3, "matin", 4, "soir")
+        P(ALICE, MA, w, 0, "morning", 1, "evening")
+        P(ALICE, TR, w, 2, "morning", 2, "midday")
+        P(ALICE, CP, w, 2, "midday", 2, "evening")
+        P(ALICE, UIR, w, 3, "morning", 4, "evening")
 
-        # Yassine : lun matin | lun PM->mar soir | mer full | jeu matin | jeu PM->ven soir
-        P(YASSINE, FA, w, 0, "matin", 0, "midi")
-        P(YASSINE, AF, w, 0, "midi", 1, "soir")  # lun PM -> mar soir inter-jours
-        P(YASSINE, PC, w, 2, "matin", 2, "soir")
-        P(YASSINE, INF, w, 3, "matin", 3, "midi")
-        P(YASSINE, AM, w, 3, "midi", 4, "soir")  # jeu PM -> ven soir inter-jours
+        P(YASSINE, AT, w, 0, "morning", 0, "midday")
+        P(YASSINE, BA, w, 0, "midday", 1, "evening")
+        P(YASSINE, CP, w, 2, "morning", 2, "evening")
+        P(YASSINE, INF, w, 3, "morning", 3, "midday")
+        P(YASSINE, MA, w, 3, "midday", 4, "evening")
 
-        # Sophie : lun->jeu multi-jours (4 jours) | ven full
-        P(SOPHIE, AM, w, 0, "matin", 3, "soir")
-        P(SOPHIE, RE, w, 4, "matin", 4, "soir")
+        P(SOPHIE, MA, w, 0, "morning", 3, "evening")
+        P(SOPHIE, TR, w, 4, "morning", 4, "evening")
 
-        # Thomas : lun matin | lun PM->mar soir | mer-jeu multi-jours | ven matin + apres-midi
-        P(THOMAS, RE, w, 0, "matin", 0, "midi")
-        P(THOMAS, AF, w, 0, "midi", 1, "soir")  # lun PM -> mar soir
-        P(THOMAS, PC, w, 2, "matin", 3, "soir")
-        P(THOMAS, INF, w, 4, "matin", 4, "midi")
-        P(THOMAS, FA, w, 4, "midi", 4, "soir")
+        P(THOMAS, TR, w, 0, "morning", 0, "midday")
+        P(THOMAS, BA, w, 0, "midday", 1, "evening")
+        P(THOMAS, CP, w, 2, "morning", 3, "evening")
+        P(THOMAS, INF, w, 4, "morning", 4, "midday")
+        P(THOMAS, AT, w, 4, "midday", 4, "evening")
 
-        # Camille : lun full | mar matin + apres-midi | mer-ven multi-jours
-        P(CAMILLE, RE, w, 0, "matin", 0, "soir")
-        P(CAMILLE, PC, w, 1, "matin", 1, "midi")
-        P(CAMILLE, AM, w, 1, "midi", 1, "soir")
-        P(CAMILLE, RUI, w, 2, "matin", 4, "soir")  # mer->ven
+        P(CAMILLE, TR, w, 0, "morning", 0, "evening")
+        P(CAMILLE, CP, w, 1, "morning", 1, "midday")
+        P(CAMILLE, MA, w, 1, "midday", 1, "evening")
+        P(CAMILLE, UIR, w, 2, "morning", 4, "evening")
 
         # --------------------------------------------------------------
-        # Semaine -1  (semaine passee)
-        # Couverture:
-        #   - RTT (Alice mer, Camille mer)
-        #   - Jour Ferie (Thomas lun)
-        #   - Arret Maladie multi-jours (Yassine jeu-ven)
-        #   - Notes sur les absences
+        # Week -1
         # --------------------------------------------------------------
         w = current_monday + timedelta(weeks=-1)
 
-        # Alice : lun matin+PM | mar full | mer RTT | jeu matin+PM | ven full
-        P(ALICE, RE, w, 0, "matin", 0, "midi")
-        P(ALICE, AM, w, 0, "midi", 0, "soir")
-        P(ALICE, PC, w, 1, "matin", 1, "soir")
+        P(ALICE, TR, w, 0, "morning", 0, "midday")
+        P(ALICE, MA, w, 0, "midday", 0, "evening")
+        P(ALICE, CP, w, 1, "morning", 1, "evening")
         P(
             ALICE,
             RTT,
             w,
             2,
-            "matin",
+            "morning",
             2,
-            "soir",
-            "RTT recuperation heures supplementaires",
+            "evening",
+            "RTT — overtime recovery",
         )
-        P(ALICE, AF, w, 3, "matin", 3, "midi")
-        P(ALICE, RUI, w, 3, "midi", 3, "soir")
-        P(ALICE, FA, w, 4, "matin", 4, "soir")
+        P(ALICE, BA, w, 3, "morning", 3, "midday")
+        P(ALICE, UIR, w, 3, "midday", 3, "evening")
+        P(ALICE, AT, w, 4, "morning", 4, "evening")
 
-        # Yassine : lun->mer multi-jours | jeu-ven Arret Maladie
-        P(YASSINE, PC, w, 0, "matin", 2, "soir")
+        P(YASSINE, CP, w, 0, "morning", 2, "evening")
         P(
             YASSINE,
-            ABS,
+            SL,
             w,
             3,
-            "matin",
+            "morning",
             4,
-            "soir",
-            "Arret maladie certifie medecin -- 2 jours",
+            "evening",
+            "Certified sick leave -- 2 days",
         )
 
-        # Sophie : lun matin | lun PM->mer soir | jeu full | ven matin+PM
-        P(SOPHIE, RE, w, 0, "matin", 0, "midi")
-        P(SOPHIE, INF, w, 0, "midi", 2, "soir")  # lun PM -> mer soir
-        P(SOPHIE, AF, w, 3, "matin", 3, "soir")
-        P(SOPHIE, FA, w, 4, "matin", 4, "midi")
-        P(SOPHIE, PC, w, 4, "midi", 4, "soir")
+        P(SOPHIE, TR, w, 0, "morning", 0, "midday")
+        P(SOPHIE, INF, w, 0, "midday", 2, "evening")
+        P(SOPHIE, BA, w, 3, "morning", 3, "evening")
+        P(SOPHIE, AT, w, 4, "morning", 4, "midday")
+        P(SOPHIE, CP, w, 4, "midday", 4, "evening")
 
-        # Thomas : lun Jour Ferie | mar->jeu multi-jours | ven matin+PM
-        P(THOMAS, JF, w, 0, "matin", 0, "soir", "Lundi de Paques")
-        P(THOMAS, AM, w, 1, "matin", 3, "soir")  # mar->jeu
-        P(THOMAS, RE, w, 4, "matin", 4, "midi")
-        P(THOMAS, FA, w, 4, "midi", 4, "soir")
+        P(THOMAS, PH, w, 0, "morning", 0, "evening", "Easter Monday")
+        P(THOMAS, MA, w, 1, "morning", 3, "evening")
+        P(THOMAS, TR, w, 4, "morning", 4, "midday")
+        P(THOMAS, AT, w, 4, "midday", 4, "evening")
 
-        # Camille : lun-mar multi-jours | mer RTT | jeu matin+PM | ven full
-        P(CAMILLE, PC, w, 0, "matin", 1, "soir")
-        P(CAMILLE, RTT, w, 2, "matin", 2, "soir", "RTT pose")
-        P(CAMILLE, AM, w, 3, "matin", 3, "midi")
-        P(CAMILLE, RUI, w, 3, "midi", 3, "soir")
-        P(CAMILLE, RE, w, 4, "matin", 4, "soir")
+        P(CAMILLE, CP, w, 0, "morning", 1, "evening")
+        P(CAMILLE, RTT, w, 2, "morning", 2, "evening", "RTT taken")
+        P(CAMILLE, MA, w, 3, "morning", 3, "midday")
+        P(CAMILLE, UIR, w, 3, "midday", 3, "evening")
+        P(CAMILLE, TR, w, 4, "morning", 4, "evening")
 
         # --------------------------------------------------------------
-        # Semaine 0  (semaine courante)
-        # Couverture:
-        #   - Seuls les jours jusqu'a aujourd'hui sont remplis pour
-        #     simuler la saisie progressive en cours de semaine.
-        #   - Les jours non atteints laissent des cases vides (test UI).
+        # Week 0 (current week)
         # --------------------------------------------------------------
         w = current_monday
-        today_offset = today.weekday()  # 0=lun ... 4=ven
+        today_offset = today.weekday()
 
-        # Alice : lun full | mar matin+PM  (jeu-ven vides intentionnellement)
         if today_offset >= 0:
-            P(ALICE, PC, w, 0, "matin", 0, "soir")
+            P(ALICE, CP, w, 0, "morning", 0, "evening")
         if today_offset >= 1:
-            P(ALICE, RE, w, 1, "matin", 1, "midi")
-            P(ALICE, AF, w, 1, "midi", 1, "soir")
+            P(ALICE, TR, w, 1, "morning", 1, "midday")
+            P(ALICE, BA, w, 1, "midday", 1, "evening")
 
-        # Yassine : lun full ou lun-mar multi (si mar atteint) | mer matin
         if today_offset >= 1:
-            P(YASSINE, INF, w, 0, "matin", 1, "soir")
+            P(YASSINE, INF, w, 0, "morning", 1, "evening")
         elif today_offset == 0:
-            P(YASSINE, INF, w, 0, "matin", 0, "soir")
+            P(YASSINE, INF, w, 0, "morning", 0, "evening")
         if today_offset >= 2:
-            P(YASSINE, AM, w, 2, "matin", 2, "midi")
+            P(YASSINE, MA, w, 2, "morning", 2, "midday")
 
-        # Sophie : lun full | mar matin+PM | mer full
         if today_offset >= 0:
-            P(SOPHIE, RE, w, 0, "matin", 0, "soir")
+            P(SOPHIE, TR, w, 0, "morning", 0, "evening")
         if today_offset >= 1:
-            P(SOPHIE, PC, w, 1, "matin", 1, "midi")
-            P(SOPHIE, FA, w, 1, "midi", 1, "soir")
+            P(SOPHIE, CP, w, 1, "morning", 1, "midday")
+            P(SOPHIE, AT, w, 1, "midday", 1, "evening")
         if today_offset >= 2:
-            P(SOPHIE, RUI, w, 2, "matin", 2, "soir")
+            P(SOPHIE, UIR, w, 2, "morning", 2, "evening")
 
-        # Thomas : lun matin+PM | mar-mer multi (si mer atteint)
         if today_offset >= 0:
-            P(THOMAS, AF, w, 0, "matin", 0, "midi")
-            P(THOMAS, AM, w, 0, "midi", 0, "soir")
+            P(THOMAS, BA, w, 0, "morning", 0, "midday")
+            P(THOMAS, MA, w, 0, "midday", 0, "evening")
         if today_offset >= 2:
-            P(THOMAS, PC, w, 1, "matin", 2, "soir")  # mar-mer multi
+            P(THOMAS, CP, w, 1, "morning", 2, "evening")
 
-        # Camille : lun full (note formation) | mar matin+PM->mer (si atteint)
         if today_offset >= 0:
             P(
                 CAMILLE,
-                FA,
+                AT,
                 w,
                 0,
-                "matin",
+                "morning",
                 0,
-                "soir",
-                "Formation avancee Azure Administrator (AZ-104)",
+                "evening",
+                "Advanced Azure Administrator training (AZ-104)",
             )
         if today_offset >= 1:
-            P(CAMILLE, RE, w, 1, "matin", 1, "midi")
+            P(CAMILLE, TR, w, 1, "morning", 1, "midday")
         if today_offset >= 2:
-            P(CAMILLE, INF, w, 1, "midi", 2, "soir")  # mar PM -> mer soir
+            P(CAMILLE, INF, w, 1, "midday", 2, "evening")
 
         # --------------------------------------------------------------
-        # Semaine +1  (semaine prochaine — planification anticipee)
-        # Couverture:
-        #   - RTT planifie (Alice lun)
-        #   - Formation semaine entiere lun->ven (Thomas)
-        #   - Reunion isolee demi-journee (Camille mar matin)
+        # Week +1 (next week — forward planning)
         # --------------------------------------------------------------
         w = current_monday + timedelta(weeks=1)
 
-        P(ALICE, RTT, w, 0, "matin", 0, "soir", "RTT planifie -- pont")
+        P(ALICE, RTT, w, 0, "morning", 0, "evening", "Planned RTT — bridge day")
         P(
             THOMAS,
-            FA,
+            AT,
             w,
             0,
-            "matin",
+            "morning",
             4,
-            "soir",
-            "Semaine de formation Azure DevOps (AZ-400) -- certif visee",
+            "evening",
+            "Azure DevOps training week (AZ-400) -- certification target",
         )
-        P(CAMILLE, RE, w, 1, "matin", 1, "midi")
+        P(CAMILLE, TR, w, 1, "morning", 1, "midday")
 
         db.session.commit()
 
-        total = Pointage.query.count()
+        total = TimeEntry.query.count()
         return {
             "created": True,
-            "pointages_created": total,
-            "utilisateurs": len(utilisateurs),
-            "projets": len(projets),
+            "entries_created": total,
+            "users": len(users),
+            "projects": len(projects),
             "codes": len(codes),
         }
 
     db.session.commit()
     return {
         "created": False,
-        "pointages_created": 0,
-        "utilisateurs": len(utilisateurs),
-        "projets": len(projets),
+        "entries_created": 0,
+        "users": len(users),
+        "projects": len(projects),
         "codes": len(codes),
     }
