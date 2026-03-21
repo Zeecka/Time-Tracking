@@ -1,6 +1,5 @@
 from flask import Blueprint
 
-from app.routes.analyzer import analyzer_bp
 from app.routes.project import project_bp
 from app.routes.stats import stats_bp
 from app.routes.time_entry import time_entry_bp
@@ -13,5 +12,4 @@ __all__ = [
     "user_bp",
     "time_entry_bp",
     "stats_bp",
-    "analyzer_bp",
 ]

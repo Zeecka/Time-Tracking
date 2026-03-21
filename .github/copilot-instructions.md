@@ -8,7 +8,7 @@
 
 ## Domain rules you must preserve
 - Domain language is French and API fields are French (`numero_semaine`, `annee`, `date_debut`, `periode_fin`, etc.); keep naming consistent.
-- `Pointage` periods are half-day based and normalized to `matin|midi|soir`; legacy inputs (`journee`, `apres_midi`) are still accepted in backend normalization (`backend/app/routes/pointage.py`).
+- `Pointage` periods are half-day based and normalized to `morning|midday|evening`; legacy inputs (`journee`, `apres_midi`, `matin`, `midi`, `soir`, `full_day`, `fullday`, `afternoon`) are still accepted in backend normalization (`backend/app/routes/pointage.py`).
 - Week/year logic is ISO-based: `date_debut` and `date_fin` must belong to the provided ISO week/year.
 - Overlap detection is strict per user and returns `409` on conflicts.
 - Adjacent pointages for same user+project are auto-merged (including note concatenation), so avoid changes that break merge semantics.

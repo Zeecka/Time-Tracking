@@ -1,0 +1,8 @@
+.project-table thead th,
+.project-table tbody td,
+.tracking-code-table thead th,
+.tracking-code-table tbody td,
+.user-table thead th,
+.user-table tbody td {
+  vertical-align: middle;
+}

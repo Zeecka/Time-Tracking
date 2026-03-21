@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import { Navbar, Nav, Container, Button, Form } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css';
 
 // Import components
 import TrackingCodeList from './components/TrackingCodeList';

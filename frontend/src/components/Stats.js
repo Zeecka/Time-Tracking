@@ -35,17 +35,12 @@ const CURRENT_YEAR = CURRENT.year;
 const CURRENT_MONTH = new Date().getMonth() + 1;
 const CURRENT_WEEK = CURRENT.week;
 
-const MOIS_LABELS = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
-
 // ── Theme helper ──────────────────────────────────────────────────────────────
 const isDarkMode = () =>
   document.documentElement.getAttribute('data-bs-theme') === 'dark';
 
 // ── Tooltip personnalisé ──────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label, unit = 'demi-j.' }) => {
+const CustomTooltip = ({ active, payload, label, unit = '' }) => {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
@@ -129,6 +124,22 @@ export default function Stats() {
   // Auto-fetch on mount and when filters change
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
+  // ── Month labels (translated)
+  const monthLabels = useMemo(() => [
+    t('months.january'),
+    t('months.february'),
+    t('months.march'),
+    t('months.april'),
+    t('months.may'),
+    t('months.june'),
+    t('months.july'),
+    t('months.august'),
+    t('months.september'),
+    t('months.october'),
+    t('months.november'),
+    t('months.december'),
+  ], [t]);
+
   // ── Year options
   const yearOptions = useMemo(() => {
     const years = [];
@@ -174,7 +185,11 @@ export default function Stats() {
   // ── Data for pie chart (projects)
   const pieData = useMemo(() => {
     if (!stats) return [];
-    return stats.projects.map(p => ({ name: p.name, value: p.half_days, couleur: p.color }));
+    return stats.projects.map((p, index) => ({
+      name: p.name,
+      value: p.half_days,
+      color: p.color || getCodePointageColor(index),
+    }));
   }, [stats]);
 
   // ── Period label
@@ -182,9 +197,9 @@ export default function Stats() {
     if (!stats) return '';
     const { granularity: g, year: a, month: m, week_number: s } = stats.period;
     if (g === 'week') return `${t('stats.week')} ${s} / ${a}`;
-    if (g === 'month') return `${MOIS_LABELS[(m || 1) - 1]} ${a}`;
+    if (g === 'month') return `${monthLabels[(m || 1) - 1]} ${a}`;
     return `${t('common.year')} ${a}`;
-  }, [stats, t]);
+  }, [stats, t, monthLabels]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -240,7 +255,7 @@ export default function Stats() {
               <Col xs={6} sm={4} md={3}>
                 <Form.Label className="fw-semibold mb-1">{t('stats.month')}</Form.Label>
                 <Form.Select size="sm" value={month} onChange={e => setMonth(Number(e.target.value))}>
-                  {MOIS_LABELS.map((name, i) => (
+                  {monthLabels.map((name, i) => (
                     <option key={i + 1} value={i + 1}>{name}</option>
                   ))}
                 </Form.Select>
@@ -366,7 +381,7 @@ export default function Stats() {
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="Présent" stackId="a" fill={chartColors.presence} radius={[0, 4, 4, 0]}>
                           <LabelList dataKey="Présent" position="insideRight" style={{ fill: '#fff', fontSize: 11, fontWeight: 600 }} formatter={v => v > 0 ? v : ''} />
@@ -410,8 +425,8 @@ export default function Stats() {
                             ))}
                           </Pie>
                           <Tooltip
-                            content={<CustomTooltip unit="demi-j." />}
-                            formatter={(value, name) => [`${value} demi-j.`, name]}
+                            content={<CustomTooltip unit={t('common.halfDayAbbr')} />}
+                            formatter={(value, name) => [`${value} ${t('common.halfDayAbbr')}`, name]}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -454,7 +469,7 @@ export default function Stats() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<CustomTooltip unit="demi-j." />} />
+                    <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="half_days" name={t('stats.workedHalfDays')} fill="#3498db" radius={[4, 4, 0, 0]}>
                       <LabelList dataKey="half_days" position="top" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
@@ -527,9 +542,9 @@ export default function Stats() {
                 </ResponsiveContainer>
                 {/* Color legend */}
                 <div className="d-flex gap-3 justify-content-center mt-2 flex-wrap" style={{ fontSize: 12 }}>
-                  <span><span style={{ background: '#2ecc71', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>≥ 80% — Bonne présence</span>
-                  <span><span style={{ background: '#f39c12', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>50–79% — Moyenne</span>
-                  <span><span style={{ background: '#e74c3c', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>&lt; 50% — Faible présence</span>
+                  <span><span style={{ background: '#2ecc71', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>≥ 80% — {t('stats.presenceLevelGood')}</span>
+                  <span><span style={{ background: '#f39c12', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>50–79% — {t('stats.presenceLevelAverage')}</span>
+                  <span><span style={{ background: '#e74c3c', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>&lt; 50% — {t('stats.presenceLevelLow')}</span>
                 </div>
               </Card.Body>
             </Card>
@@ -539,7 +554,7 @@ export default function Stats() {
           <Card className="mb-4">
             <Card.Header className="fw-semibold">
               <i className="fas fa-table me-2 text-secondary"></i>
-              Détail par utilisateur
+                {t('stats.userDetails')}
             </Card.Header>
             <Card.Body className="p-0">
               <div className="table-responsive">
@@ -652,7 +667,7 @@ export default function Stats() {
             <Card className="mb-4">
               <Card.Header className="fw-semibold">
                 <i className="fas fa-layer-group me-2" style={{ color: '#9b59b6' }}></i>
-                Répartition par projet (par utilisateur)
+                {t('stats.distributionByProjectByUser')}
               </Card.Header>
               <Card.Body>
                 <ResponsiveContainer width="100%" height={Math.max(180, stats.users.length * 44 + 40)}>
@@ -711,7 +726,7 @@ export default function Stats() {
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<CustomTooltip unit="demi-j." />} />
+                        <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                         <Bar dataKey="half_days" name={t('stats.halfDays')} fill="#e67e22" radius={[0, 4, 4, 0]}>
                           <LabelList dataKey="half_days" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
@@ -739,7 +754,7 @@ export default function Stats() {
                           innerRadius={40}
                           paddingAngle={2}
                         >
-                          {stats.codes_pointage.map((entry, index) => (
+                          {stats.tracking_codes.map((entry, index) => (
                             <Cell
                               key={index}
                               fill={getCodePointageColor(index)}
@@ -747,8 +762,8 @@ export default function Stats() {
                           ))}
                         </Pie>
                         <Tooltip
-                          content={<CustomTooltip unit="demi-j." />}
-                          formatter={(value, name) => [`${value} demi-j.`, name]}
+                          content={<CustomTooltip unit={t('common.halfDayAbbr')} />}
+                          formatter={(value, name) => [`${value} ${t('common.halfDayAbbr')}`, name]}
                         />
                       </PieChart>
                     </ResponsiveContainer>

@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Select from 'react-select';
 import { useTranslation } from 'react-i18next';
 import { timeEntryAPI, userAPI, projectAPI } from '../services/api';
-import './PointageGrid.css';
+import './TimeEntryGrid.css';
 
 const getCurrentIsoWeekInfo = () => {
   const now = new Date();
@@ -993,8 +993,8 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     return users
       .map((user) => ({
         id: user.id,
-        nom: user.name || 'N/A',
-        couleur: user.color || '#ccc',
+        name: user.name || 'N/A',
+        color: user.color || '#ccc',
         missingDays: userMissingDaysMap[user.id] ?? EXPECTED_WEEK_DAYS,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
@@ -1078,13 +1078,13 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     if (!ganttGroupMap.has(key)) {
       const row = {
         key,
-        utilisateurId: userId,
-        utilisateurNom: item.user?.name || 'N/A',
-        utilisateurCouleur: item.user?.color || '#ccc',
-        projetId,
-        projetNom: item.project?.name || 'N/A',
-        projetCouleur: item.project?.color || '#6c757d',
-        projetMotif: item.project?.pattern || 'solid',
+        userId,
+        userNom: item.user?.name || 'N/A',
+        userCouleur: item.user?.color || '#ccc',
+        projectId: projetId,
+        projectNom: item.project?.name || 'N/A',
+        projectCouleur: item.project?.color || '#6c757d',
+        projectMotif: item.project?.pattern || 'solid',
         bars: [],
       };
       ganttGroupMap.set(key, row);
@@ -1279,7 +1279,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           <div className="d-flex gap-2 align-items-center flex-wrap">
             <Button
               as={Link}
-              to={`/timeEntries/gantt${weekQueryString}`}
+              to={`/time-entries/gantt${weekQueryString}`}
               variant={isGanttView ? 'dark' : 'outline-secondary'}
               size="sm"
             >
@@ -1287,7 +1287,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
             </Button>
             <Button
               as={Link}
-              to={`/timeEntries/table${weekQueryString}`}
+              to={`/time-entries/table${weekQueryString}`}
               variant={isTableView ? 'dark' : 'outline-secondary'}
               size="sm"
             >
@@ -1295,7 +1295,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
             </Button>
             <Button
               as={Link}
-              to={`/timeEntries/synthese${weekQueryString}`}
+              to={`/time-entries/synthesis${weekQueryString}`}
               variant={isSynthesisView ? 'dark' : 'outline-secondary'}
               size="sm"
             >
@@ -1305,7 +1305,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
               <Form.Check
                 type="switch"
                 id="grouped-view-switch"
-                label="Vue regroupée"
+                label={t('grid.groupedView')}
                 checked={groupedView}
                 onChange={(e) => setGroupedView(e.target.checked)}
                 className="ms-2 mb-0"
@@ -1466,7 +1466,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                             width: `${(previewSpan / 10) * 100}%`,
                             ...getMotifStyle(row.projectCouleur, row.projectMotif),
                           }}
-                          title={`${row.userNom} · ${row.projectNom}${bar.pointage.note ? ` · 📝 ${bar.pointage.note}` : ''} · Clic gauche: modifier · Clic droit: supprimer · Poignées: étirer/réduire`}
+                          title={`${row.userNom} · ${row.projectNom}${bar.pointage.note ? ` · 📝 ${bar.pointage.note}` : ''} · ${t('grid.ganttLeftClick')} · ${t('grid.ganttRightClick')} · ${t('grid.ganttResize')}`}
                           onClick={() => {
                             if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
                               return;
@@ -1577,7 +1577,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                     </tbody>
                     <tfoot>
                       <tr className="fw-bold">
-                        <td colSpan={2}>Total</td>
+                        <td colSpan={2}>{t('grid.total') || 'Total'}</td>
                         {syntheseData.users.map((u) => {
                           const userId = u?.id ?? 'unknown';
                           const colTotal = syntheseData.projects.reduce((s, proj) => {
@@ -1677,20 +1677,20 @@ function TimeEntryGrid({ viewMode = 'table' }) {
             <thead>
               <tr>
                 <th onClick={() => handleSort('user')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Utilisateur {renderSortIcon('user')}
+                  {t('timeEntry.user')} {renderSortIcon('user')}
                 </th>
                 <th onClick={() => handleSort('project')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Projet {renderSortIcon('project')}
+                  {t('timeEntry.project')} {renderSortIcon('project')}
                 </th>
                 <th onClick={() => handleSort('days')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                   {t('grid.days') || 'Day(s)'} {renderSortIcon('days')}
                 </th>
                 <th>{t('project.trackingCode')}</th>
                 <th onClick={() => handleSort('start_date')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Début {renderSortIcon('start_date')}
+                  {t('timeEntry.startDate')} {renderSortIcon('start_date')}
                 </th>
                 <th onClick={() => handleSort('end_date')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  Fin {renderSortIcon('end_date')}
+                  {t('timeEntry.endDate')} {renderSortIcon('end_date')}
                 </th>
                 <th>{t('common.actions')}</th>
               </tr>
@@ -1738,14 +1738,14 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                 <td className="text-center" style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}>
                   {formatDateDDMMYYYY(item.start_date)}
                   {' '}
-                  <span style={{ fontSize: '0.85rem', fontStyle: 'italic', textTransform: 'lowercase' }}>
+                  <span style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
                     ({PERIODE_LABELS[item.start_period] || item.start_period})
                   </span>
                 </td>
                 <td className="text-center" style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}>
                   {formatDateDDMMYYYY(item.end_date)}
                   {' '}
-                  <span style={{ fontSize: '0.85rem', fontStyle: 'italic', textTransform: 'lowercase' }}>
+                  <span style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
                     ({PERIODE_LABELS[item.end_period] || item.end_period})
                   </span>
                 </td>
@@ -1926,7 +1926,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                       onClick={() => !isDisabled && handlePeriodeFinChange(periode.value)}
                       disabled={isDisabled}
                     >
-                      {periode.label}
+                      {t(`periods.${periode.value}`)}
                     </button>
                   );
                 })}

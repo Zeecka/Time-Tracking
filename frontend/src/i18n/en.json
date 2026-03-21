@@ -62,7 +62,16 @@
     "year": "Year",
     "month": "Month",
     "addNote": "Add a note...",
-    "noData": "No data available"
+    "noData": "No data available",
+    "refresh": "Refresh",
+    "csvExample": "CSV example",
+    "noDataPeriod": "No data found for this period. Try adjusting the filters.",
+    "selectCode": "Select a code",
+    "to": "to",
+    "andMore": "and",
+    "moreEntries": "more time entries",
+    "halfDayAbbr": "half-d",
+    "optional": "(optional)"
   },
   "home": {
     "title": "Time Tracker",
@@ -97,7 +106,8 @@
     "created": "Tracking code created successfully",
     "updated": "Tracking code updated successfully",
     "deleted": "Tracking code deleted successfully",
-    "importSuccess": "Import completed: {{created}} created, {{skipped}} skipped"
+    "importSuccess": "Import completed: {{created}} created, {{skipped}} skipped",
+    "exportCsvSuccess": "CSV export done."
   },
   "project": {
     "title": "Projects",
@@ -125,7 +135,8 @@
     "created": "Project created successfully",
     "updated": "Project updated successfully",
     "deleted": "Project deleted successfully",
-    "importSuccess": "Import completed: {{created}} created, {{updated}} updated"
+    "importSuccess": "Import completed: {{created}} created, {{updated}} updated",
+    "exportCsvSuccess": "CSV export done."
   },
   "user": {
     "title": "Users",
@@ -148,7 +159,8 @@
     "created": "User created successfully",
     "updated": "User updated successfully",
     "deleted": "User deleted successfully",
-    "importSuccess": "Import completed: {{created}} created, {{updated}} updated"
+    "importSuccess": "Import completed: {{created}} created, {{updated}} updated",
+    "exportCsvSuccess": "CSV export done."
   },
   "timeEntry": {
     "title": "Time Entries",
@@ -175,20 +187,33 @@
     "importCsv": "Import CSV",
     "created": "Time entry created successfully",
     "updated": "Time entry updated successfully",
-    "deleted": "Time entry deleted successfully"
+    "deleted": "Time entry deleted successfully",
+    "entriesFound": "time entr(y/ies) found from"
   },
   "grid": {
     "weekView": "Week View",
     "ganttView": "Gantt View",
     "tableView": "Table View",
     "synthesisView": "Synthesis View",
+    "days": "Day(s)",
+    "total": "Total",
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
     "currentWeek": "Current week",
     "week": "Week",
     "allUsers": "All users",
     "selectUser": "Select a user",
-    "selectColumns": "Select at least one column to export"
+    "selectColumns": "Select at least one column to export",
+    "missingDays": "Missing days",
+    "createdAt": "Created at",
+    "csvExample": "CSV example",
+    "clickToAdd": "Click to add a time entry",
+    "resizeStart": "Resize start",
+    "resizeEnd": "Resize end",
+    "ganttLeftClick": "Left click: edit",
+    "ganttRightClick": "Right click: delete",
+    "ganttResize": "Handles: resize",
+    "groupedView": "Grouped view"
   },
   "stats": {
     "title": "Statistics",
@@ -213,7 +238,24 @@
     "halfDays": "Half-days",
     "possibleHalfDays": "Possible half-days",
     "workingDays": "Working days",
-    "errorLoad": "Error loading statistics"
+    "errorLoad": "Error loading statistics",
+    "forThisUser": "for this user",
+    "averageAllUsers": "average all users",
+    "activeUsers": "Active users",
+    "outOf": "out of",
+    "usersCount": "user(s)",
+    "pointedProjects": "Tracked projects",
+    "presenceAbsenceByUser": "Presence / Absence by user",
+    "distributionByProject": "Distribution by project",
+    "monthlyEvolution": "Monthly evolution",
+    "weeklyEvolution": "Weekly evolution",
+    "presenceRateByUser": "Presence rate by user",
+    "distributionByTrackingCode": "Distribution by tracking code",
+    "userDetails": "User details",
+    "distributionByProjectByUser": "Distribution by project (by user)",
+    "presenceLevelGood": "Good presence",
+    "presenceLevelAverage": "Average",
+    "presenceLevelLow": "Low presence"
   },
   "export": {
     "title": "Export to Excel",
@@ -222,6 +264,14 @@
     "selectColumns": "Select columns to export",
     "export": "Export",
     "noData": "No data to export",
-    "errorExport": "Error exporting to Excel"
+    "errorExport": "Error exporting to Excel",
+    "selectPeriod": "Select period",
+    "startYear": "Start year",
+    "startWeek": "Start week",
+    "endYear": "End year",
+    "endWeek": "End week",
+    "columnsSelected": "column(s) selected",
+    "dataPreview": "Data preview",
+    "exporting": "Exporting..."
   }
 }

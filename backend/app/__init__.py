@@ -22,7 +22,6 @@ def create_app(config_name=None):
 
     # Register blueprints
     from app.routes import (
-        analyzer_bp,
         project_bp,
         stats_bp,
         time_entry_bp,
@@ -30,12 +29,11 @@ def create_app(config_name=None):
         user_bp,
     )
 
-    app.register_blueprint(tracking_code_bp, url_prefix="/api/v1/tracking-codes")
-    app.register_blueprint(project_bp, url_prefix="/api/v1/projects")
-    app.register_blueprint(user_bp, url_prefix="/api/v1/users")
-    app.register_blueprint(time_entry_bp, url_prefix="/api/v1/time-entries")
+    app.register_blueprint(tracking_code_bp, url_prefix="/api/v1/tracking-code")
+    app.register_blueprint(project_bp, url_prefix="/api/v1/project")
+    app.register_blueprint(user_bp, url_prefix="/api/v1/user")
+    app.register_blueprint(time_entry_bp, url_prefix="/api/v1/time-entry")
     app.register_blueprint(stats_bp, url_prefix="/api/v1/stats")
-    app.register_blueprint(analyzer_bp, url_prefix="/api/v1/analyzer")
 
     with app.app_context():
         try:

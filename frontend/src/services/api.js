@@ -11,16 +11,16 @@ const api = axios.create({
 
 // Tracking Code API
 export const trackingCodeAPI = {
-  getAll: () => api.get('/tracking-codes'),
-  getById: (id) => api.get(`/tracking-codes/${id}`),
-  create: (data) => api.post('/tracking-codes', data),
-  update: (id, data) => api.put(`/tracking-codes/${id}`, data),
-  delete: (id) => api.delete(`/tracking-codes/${id}`),
-  exportCSV: () => api.get('/tracking-codes/export-csv', { responseType: 'blob' }),
+  getAll: () => api.get('/tracking-code'),
+  getById: (id) => api.get(`/tracking-code/${id}`),
+  create: (data) => api.post('/tracking-code', data),
+  update: (id, data) => api.put(`/tracking-code/${id}`, data),
+  delete: (id) => api.delete(`/tracking-code/${id}`),
+  exportCSV: () => api.get('/tracking-code/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/tracking-codes/import-csv', formData, {
+    return api.post('/tracking-code/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
@@ -28,16 +28,16 @@ export const trackingCodeAPI = {
 
 // Project API
 export const projectAPI = {
-  getAll: () => api.get('/projects'),
-  getById: (id) => api.get(`/projects/${id}`),
-  create: (data) => api.post('/projects', data),
-  update: (id, data) => api.put(`/projects/${id}`, data),
-  delete: (id) => api.delete(`/projects/${id}`),
-  exportCSV: () => api.get('/projects/export-csv', { responseType: 'blob' }),
+  getAll: () => api.get('/project'),
+  getById: (id) => api.get(`/project/${id}`),
+  create: (data) => api.post('/project', data),
+  update: (id, data) => api.put(`/project/${id}`, data),
+  delete: (id) => api.delete(`/project/${id}`),
+  exportCSV: () => api.get('/project/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/projects/import-csv', formData, {
+    return api.post('/project/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
@@ -45,16 +45,16 @@ export const projectAPI = {
 
 // User API
 export const userAPI = {
-  getAll: () => api.get('/users'),
-  getById: (id) => api.get(`/users/${id}`),
-  create: (data) => api.post('/users', data),
-  update: (id, data) => api.put(`/users/${id}`, data),
-  delete: (id) => api.delete(`/users/${id}`),
-  exportCSV: () => api.get('/users/export-csv', { responseType: 'blob' }),
+  getAll: () => api.get('/user'),
+  getById: (id) => api.get(`/user/${id}`),
+  create: (data) => api.post('/user', data),
+  update: (id, data) => api.put(`/user/${id}`, data),
+  delete: (id) => api.delete(`/user/${id}`),
+  exportCSV: () => api.get('/user/export-csv', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/users/import-csv', formData, {
+    return api.post('/user/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
@@ -62,17 +62,17 @@ export const userAPI = {
 
 // Time Entry API
 export const timeEntryAPI = {
-  getAll: (params) => api.get('/time-entries', { params }),
-  getById: (id) => api.get(`/time-entries/${id}`),
-  create: (data) => api.post('/time-entries', data),
-  update: (id, data) => api.put(`/time-entries/${id}`, data),
-  delete: (id) => api.delete(`/time-entries/${id}`),
-  bulkCreate: (data) => api.post('/time-entries/bulk', data),
-  exportCSV: (params) => api.get('/time-entries/export-csv', { params, responseType: 'blob' }),
+  getAll: (params) => api.get('/time-entry', { params }),
+  getById: (id) => api.get(`/time-entry/${id}`),
+  create: (data) => api.post('/time-entry', data),
+  update: (id, data) => api.put(`/time-entry/${id}`, data),
+  delete: (id) => api.delete(`/time-entry/${id}`),
+  bulkCreate: (data) => api.post('/time-entry/bulk', data),
+  exportCSV: (params) => api.get('/time-entry/export-csv', { params, responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/time-entries/import-csv', formData, {
+    return api.post('/time-entry/import-csv', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

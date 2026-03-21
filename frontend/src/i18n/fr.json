@@ -62,7 +62,16 @@
     "year": "Année",
     "month": "Mois",
     "addNote": "Ajouter une note...",
-    "noData": "Aucune donnée disponible"
+    "noData": "Aucune donnée disponible",
+    "refresh": "Actualiser",
+    "csvExample": "Exemple CSV",
+    "noDataPeriod": "Aucune donnée trouvée pour cette période. Essayez d'ajuster les filtres.",
+    "selectCode": "Sélectionner un code",
+    "to": "à",
+    "andMore": "et",
+    "moreEntries": "plus de pointages",
+    "halfDayAbbr": "demi-j",
+    "optional": "(facultatif)"
   },
   "home": {
     "title": "Pointage",
@@ -97,7 +106,8 @@
     "created": "Code pointage créé avec succès",
     "updated": "Code pointage modifié avec succès",
     "deleted": "Code pointage supprimé avec succès",
-    "importSuccess": "Import terminé : {{created}} créé(s), {{skipped}} ignoré(s)"
+    "importSuccess": "Import terminé : {{created}} créé(s), {{skipped}} ignoré(s)",
+    "exportCsvSuccess": "Export CSV effectué."
   },
   "project": {
     "title": "Projets",
@@ -125,7 +135,8 @@
     "created": "Projet créé avec succès",
     "updated": "Projet modifié avec succès",
     "deleted": "Projet supprimé avec succès",
-    "importSuccess": "Import terminé : {{created}} créé(s), {{updated}} modifié(s)"
+    "importSuccess": "Import terminé : {{created}} créé(s), {{updated}} modifié(s)",
+    "exportCsvSuccess": "Export CSV effectué."
   },
   "user": {
     "title": "Utilisateurs",
@@ -148,7 +159,8 @@
     "created": "Utilisateur créé avec succès",
     "updated": "Utilisateur modifié avec succès",
     "deleted": "Utilisateur supprimé avec succès",
-    "importSuccess": "Import terminé : {{created}} créé(s), {{updated}} modifié(s)"
+    "importSuccess": "Import terminé : {{created}} créé(s), {{updated}} modifié(s)",
+    "exportCsvSuccess": "Export CSV effectué."
   },
   "timeEntry": {
     "title": "Pointages",
@@ -175,20 +187,33 @@
     "importCsv": "Importer CSV",
     "created": "Pointage créé avec succès",
     "updated": "Pointage modifié avec succès",
-    "deleted": "Pointage supprimé avec succès"
+    "deleted": "Pointage supprimé avec succès",
+    "entriesFound": "pointage(s) trouvé(s) du"
   },
   "grid": {
     "weekView": "Vue Semaine",
     "ganttView": "Vue Gantt",
     "tableView": "Vue Tableau",
     "synthesisView": "Vue Synthèse",
+    "days": "Jour(s)",
+    "total": "Total",
     "prevWeek": "Semaine précédente",
     "nextWeek": "Semaine suivante",
     "currentWeek": "Semaine courante",
     "week": "Semaine",
     "allUsers": "Tous les utilisateurs",
     "selectUser": "Sélectionner un utilisateur",
-    "selectColumns": "Sélectionnez au moins une colonne à exporter"
+    "selectColumns": "Sélectionnez au moins une colonne à exporter",
+    "missingDays": "Jours manquants",
+    "createdAt": "Créé le",
+    "csvExample": "Exemple CSV",
+    "clickToAdd": "Cliquer pour ajouter un pointage",
+    "resizeStart": "Redimensionner le début",
+    "resizeEnd": "Redimensionner la fin",
+    "ganttLeftClick": "Clic gauche: modifier",
+    "ganttRightClick": "Clic droit: supprimer",
+    "ganttResize": "Poignées: étirer/réduire",
+    "groupedView": "Vue regroupée"
   },
   "stats": {
     "title": "Statistiques",
@@ -213,7 +238,24 @@
     "halfDays": "Demi-journées",
     "possibleHalfDays": "Demi-journées possibles",
     "workingDays": "Jours ouvrables",
-    "errorLoad": "Erreur lors du chargement des statistiques"
+    "errorLoad": "Erreur lors du chargement des statistiques",
+    "forThisUser": "pour cet utilisateur",
+    "averageAllUsers": "moyenne de tous les utilisateurs",
+    "activeUsers": "Utilisateurs actifs",
+    "outOf": "sur",
+    "usersCount": "utilisateur(s)",
+    "pointedProjects": "Projets pointés",
+    "presenceAbsenceByUser": "Présence / Absence par utilisateur",
+    "distributionByProject": "Distribution par projet",
+    "monthlyEvolution": "Évolution mensuelle",
+    "weeklyEvolution": "Évolution hebdomadaire",
+    "presenceRateByUser": "Taux de présence par utilisateur",
+    "distributionByTrackingCode": "Distribution par code pointage",
+    "userDetails": "Détail par utilisateur",
+    "distributionByProjectByUser": "Répartition par projet (par utilisateur)",
+    "presenceLevelGood": "Bonne présence",
+    "presenceLevelAverage": "Moyenne",
+    "presenceLevelLow": "Faible présence"
   },
   "export": {
     "title": "Export Excel",
@@ -222,6 +264,14 @@
     "selectColumns": "Sélectionner les colonnes à exporter",
     "export": "Exporter",
     "noData": "Aucune donnée à exporter",
-    "errorExport": "Erreur lors de l'export Excel"
+    "errorExport": "Erreur lors de l'export Excel",
+    "selectPeriod": "Sélectionner la période",
+    "startYear": "Année de début",
+    "startWeek": "Semaine de début",
+    "endYear": "Année de fin",
+    "endWeek": "Semaine de fin",
+    "columnsSelected": "colonne(s) sélectionnée(s)",
+    "dataPreview": "Aperçu des données",
+    "exporting": "Export en cours..."
   }
 }
