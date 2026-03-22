@@ -41,11 +41,12 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: /api/v1
-        REACT_APP_LANGUAGE: ${REACT_APP_LANGUAGE:-en}
     container_name: pointage_frontend
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      APP_LANGUAGE: ${APP_LANGUAGE:-en}
     ports:
       - "80:80"
     depends_on:

@@ -20,12 +20,9 @@ RUN npm ci
 
 COPY . .
 
-# Bake the API URL and language at build time (can be overridden)
+# Bake the API URL at build time (can be overridden)
 ARG REACT_APP_API_URL=/api/v1
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
-
-ARG REACT_APP_LANGUAGE=en
-ENV REACT_APP_LANGUAGE=$REACT_APP_LANGUAGE
 
 RUN npm run build
 
@@ -41,6 +38,10 @@ COPY --from=builder /app/build /usr/share/nginx/html
 # Custom nginx config — SPA fallback (all routes → index.html)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Entrypoint: write runtime config (APP_LANGUAGE) before nginx starts
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

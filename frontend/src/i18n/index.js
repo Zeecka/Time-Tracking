@@ -4,7 +4,7 @@ import { initReactI18next } from 'react-i18next';
 import en from './en.json';
 import fr from './fr.json';
 
-const language = process.env.REACT_APP_LANGUAGE || 'en';
+const language = window.APP_LANGUAGE || process.env.REACT_APP_LANGUAGE || 'en';
 
 i18n
   .use(initReactI18next)
