@@ -22,20 +22,18 @@ def create_app(config_name=None):
 
     # Register blueprints
     from app.routes import (
-        analyzer_bp,
-        code_pointage_bp,
-        pointage_bp,
-        projet_bp,
+        project_bp,
         stats_bp,
-        utilisateur_bp,
+        time_entry_bp,
+        tracking_code_bp,
+        user_bp,
     )
 
-    app.register_blueprint(code_pointage_bp, url_prefix="/api/v1/code-pointage")
-    app.register_blueprint(projet_bp, url_prefix="/api/v1/projets")
-    app.register_blueprint(utilisateur_bp, url_prefix="/api/v1/utilisateurs")
-    app.register_blueprint(pointage_bp, url_prefix="/api/v1/pointages")
+    app.register_blueprint(tracking_code_bp, url_prefix="/api/v1/tracking-code")
+    app.register_blueprint(project_bp, url_prefix="/api/v1/project")
+    app.register_blueprint(user_bp, url_prefix="/api/v1/user")
+    app.register_blueprint(time_entry_bp, url_prefix="/api/v1/time-entry")
     app.register_blueprint(stats_bp, url_prefix="/api/v1/stats")
-    app.register_blueprint(analyzer_bp, url_prefix="/api/v1/analyzer")
 
     with app.app_context():
         try:
@@ -57,27 +55,27 @@ def create_app(config_name=None):
         result = seed_dev_data()
         if result["created"]:
             click.echo(
-                f"Données de dev créées: {result['codes']} codes, {result['projets']} projets, {result['utilisateurs']} utilisateurs, {result['pointages_created']} pointages"
+                f"Dev data created: {result['codes']} codes, {result['projects']} projects, {result['users']} users, {result['entries_created']} time entries"
             )
         else:
             click.echo(
-                f"Données de base mises à jour: {result['codes']} codes, {result['projets']} projets, {result['utilisateurs']} utilisateurs. Pointages déjà présents, génération ignorée."
+                f"Base data updated: {result['codes']} codes, {result['projects']} projects, {result['users']} users. Time entries already present, generation skipped."
             )
 
     @app.cli.command("init-db")
     @click.option(
         "--reset",
         is_flag=True,
-        help="Supprime puis recrée toutes les tables avant l'initialisation.",
+        help="Drop and recreate all tables before initialization.",
     )
     def init_db_command(reset):
         from app import models as _models  # noqa: F401
 
         if reset:
             db.drop_all()
-            click.echo("Tables supprimées.")
+            click.echo("Tables dropped.")
 
         db.create_all()
-        click.echo("Schéma de base de données initialisé.")
+        click.echo("Database schema initialized.")
 
     return app

@@ -5,29 +5,29 @@ from flask import Blueprint, Response, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import CodePointage
-from app.schemas import code_pointage_schema, code_pointages_schema
+from app.models import TrackingCode
+from app.schemas import tracking_code_schema, tracking_codes_schema
 
-code_pointage_bp = Blueprint("code_pointage", __name__)
-
-
-@code_pointage_bp.route("", methods=["GET"])
-def get_all_code_pointages():
-    """Get all code pointages"""
-    code_pointages = CodePointage.query.order_by(CodePointage.code).all()
-    return jsonify(code_pointages_schema.dump(code_pointages)), 200
+tracking_code_bp = Blueprint("tracking_code", __name__)
 
 
-@code_pointage_bp.route("/<int:id>", methods=["GET"])
-def get_code_pointage(id):
-    """Get a single code pointage by ID"""
-    code_pointage = CodePointage.query.get_or_404(id)
-    return jsonify(code_pointage_schema.dump(code_pointage)), 200
+@tracking_code_bp.route("", methods=["GET"])
+def get_all_tracking_codes():
+    """Get all tracking codes"""
+    codes = TrackingCode.query.order_by(TrackingCode.code).all()
+    return jsonify(tracking_codes_schema.dump(codes)), 200
 
 
-@code_pointage_bp.route("", methods=["POST"])
-def create_code_pointage():
-    """Create a new code pointage"""
+@tracking_code_bp.route("/<int:id>", methods=["GET"])
+def get_tracking_code(id):
+    """Get a single tracking code by ID"""
+    code = TrackingCode.query.get_or_404(id)
+    return jsonify(tracking_code_schema.dump(code)), 200
+
+
+@tracking_code_bp.route("", methods=["POST"])
+def create_tracking_code():
+    """Create a new tracking code"""
     try:
         data = request.get_json()
 
@@ -35,15 +35,15 @@ def create_code_pointage():
             return jsonify({"error": "Code is required"}), 400
 
         # Check if code already exists
-        existing = CodePointage.query.filter_by(code=data["code"]).first()
+        existing = TrackingCode.query.filter_by(code=data["code"]).first()
         if existing:
             return jsonify({"error": "Code already exists"}), 409
 
-        code_pointage = CodePointage(code=data["code"], note=data.get("note"))
-        db.session.add(code_pointage)
+        tracking_code = TrackingCode(code=data["code"], note=data.get("note"))
+        db.session.add(tracking_code)
         db.session.commit()
 
-        return jsonify(code_pointage_schema.dump(code_pointage)), 201
+        return jsonify(tracking_code_schema.dump(tracking_code)), 201
 
     except IntegrityError:
         db.session.rollback()
@@ -53,28 +53,28 @@ def create_code_pointage():
         return jsonify({"error": str(e)}), 500
 
 
-@code_pointage_bp.route("/<int:id>", methods=["PUT"])
-def update_code_pointage(id):
-    """Update a code pointage"""
+@tracking_code_bp.route("/<int:id>", methods=["PUT"])
+def update_tracking_code(id):
+    """Update a tracking code"""
     try:
-        code_pointage = CodePointage.query.get_or_404(id)
+        tracking_code = TrackingCode.query.get_or_404(id)
         data = request.get_json()
 
         if not data or "code" not in data:
             return jsonify({"error": "Code is required"}), 400
 
         # Check if new code already exists (excluding current record)
-        existing = CodePointage.query.filter(
-            CodePointage.code == data["code"], CodePointage.id != id
+        existing = TrackingCode.query.filter(
+            TrackingCode.code == data["code"], TrackingCode.id != id
         ).first()
         if existing:
             return jsonify({"error": "Code already exists"}), 409
 
-        code_pointage.code = data["code"]
-        code_pointage.note = data.get("note")
+        tracking_code.code = data["code"]
+        tracking_code.note = data.get("note")
         db.session.commit()
 
-        return jsonify(code_pointage_schema.dump(code_pointage)), 200
+        return jsonify(tracking_code_schema.dump(tracking_code)), 200
 
     except IntegrityError:
         db.session.rollback()
@@ -84,19 +84,19 @@ def update_code_pointage(id):
         return jsonify({"error": str(e)}), 500
 
 
-@code_pointage_bp.route("/<int:id>", methods=["DELETE"])
-def delete_code_pointage(id):
-    """Delete a code pointage"""
+@tracking_code_bp.route("/<int:id>", methods=["DELETE"])
+def delete_tracking_code(id):
+    """Delete a tracking code"""
     try:
-        code_pointage = CodePointage.query.get_or_404(id)
+        tracking_code = TrackingCode.query.get_or_404(id)
 
         # Check if there are associated projects
-        if code_pointage.projets.count() > 0:
+        if tracking_code.projects.count() > 0:
             return jsonify(
                 {"error": "Cannot delete code with associated projects"}
             ), 409
 
-        db.session.delete(code_pointage)
+        db.session.delete(tracking_code)
         db.session.commit()
 
         return "", 204
@@ -106,10 +106,10 @@ def delete_code_pointage(id):
         return jsonify({"error": str(e)}), 500
 
 
-@code_pointage_bp.route("/export-csv", methods=["GET"])
-def export_code_pointages_csv():
-    """Export all codes as CSV."""
-    codes = CodePointage.query.order_by(CodePointage.code).all()
+@tracking_code_bp.route("/export-csv", methods=["GET"])
+def export_tracking_codes_csv():
+    """Export all tracking codes as CSV."""
+    codes = TrackingCode.query.order_by(TrackingCode.code).all()
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -124,13 +124,13 @@ def export_code_pointages_csv():
     return Response(
         csv_content,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=codes_pointage.csv"},
+        headers={"Content-Disposition": "attachment; filename=tracking_codes.csv"},
     )
 
 
-@code_pointage_bp.route("/import-csv", methods=["POST"])
-def import_code_pointages_csv():
-    """Import codes from CSV file."""
+@tracking_code_bp.route("/import-csv", methods=["POST"])
+def import_tracking_codes_csv():
+    """Import tracking codes from CSV file."""
     try:
         if "file" not in request.files:
             return jsonify({"error": 'CSV file is required in form field "file"'}), 400
@@ -156,13 +156,13 @@ def import_code_pointages_csv():
                 errors.append({"line": idx, "error": "code is required"})
                 continue
 
-            existing = CodePointage.query.filter_by(code=code_value).first()
+            existing = TrackingCode.query.filter_by(code=code_value).first()
             if existing:
                 skipped += 1
                 continue
 
             note_value = str(row.get("note", "")).strip() or None
-            db.session.add(CodePointage(code=code_value, note=note_value))
+            db.session.add(TrackingCode(code=code_value, note=note_value))
             created += 1
 
         db.session.commit()

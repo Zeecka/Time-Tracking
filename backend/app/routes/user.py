@@ -6,10 +6,10 @@ from flask import Blueprint, Response, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Utilisateur
-from app.schemas import utilisateur_schema, utilisateurs_schema
+from app.models import User
+from app.schemas import user_schema, users_schema
 
-utilisateur_bp = Blueprint("utilisateur", __name__)
+user_bp = Blueprint("user", __name__)
 
 
 def validate_hex_color(color):
@@ -18,40 +18,40 @@ def validate_hex_color(color):
     return re.match(pattern, color) is not None
 
 
-@utilisateur_bp.route("", methods=["GET"])
-def get_all_utilisateurs():
+@user_bp.route("", methods=["GET"])
+def get_all_users():
     """Get all users"""
-    utilisateurs = Utilisateur.query.order_by(Utilisateur.nom).all()
-    return jsonify(utilisateurs_schema.dump(utilisateurs)), 200
+    users = User.query.order_by(User.name).all()
+    return jsonify(users_schema.dump(users)), 200
 
 
-@utilisateur_bp.route("/<int:id>", methods=["GET"])
-def get_utilisateur(id):
+@user_bp.route("/<int:id>", methods=["GET"])
+def get_user(id):
     """Get a single user by ID"""
-    utilisateur = Utilisateur.query.get_or_404(id)
-    return jsonify(utilisateur_schema.dump(utilisateur)), 200
+    user = User.query.get_or_404(id)
+    return jsonify(user_schema.dump(user)), 200
 
 
-@utilisateur_bp.route("", methods=["POST"])
-def create_utilisateur():
+@user_bp.route("", methods=["POST"])
+def create_user():
     """Create a new user"""
     try:
         data = request.get_json()
 
-        if not data or "nom" not in data or "couleur" not in data:
+        if not data or "name" not in data or "color" not in data:
             return jsonify({"error": "Name and color are required"}), 400
 
         # Validate color format
-        if not validate_hex_color(data["couleur"]):
+        if not validate_hex_color(data["color"]):
             return jsonify({"error": "Color must be in hex format #RRGGBB"}), 400
 
-        utilisateur = Utilisateur(
-            nom=data["nom"], couleur=data["couleur"], sub=data.get("sub")
+        user = User(
+            name=data["name"], color=data["color"], sub=data.get("sub")
         )
-        db.session.add(utilisateur)
+        db.session.add(user)
         db.session.commit()
 
-        return jsonify(utilisateur_schema.dump(utilisateur)), 201
+        return jsonify(user_schema.dump(user)), 201
 
     except IntegrityError:
         db.session.rollback()
@@ -61,41 +61,41 @@ def create_utilisateur():
         return jsonify({"error": str(e)}), 500
 
 
-@utilisateur_bp.route("/<int:id>", methods=["PUT"])
-def update_utilisateur(id):
+@user_bp.route("/<int:id>", methods=["PUT"])
+def update_user(id):
     """Update a user"""
     try:
-        utilisateur = Utilisateur.query.get_or_404(id)
+        user = User.query.get_or_404(id)
         data = request.get_json()
 
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
         # Update name if provided
-        if "nom" in data:
-            utilisateur.nom = data["nom"]
+        if "name" in data:
+            user.name = data["name"]
 
         # Update color if provided
-        if "couleur" in data:
-            if not validate_hex_color(data["couleur"]):
+        if "color" in data:
+            if not validate_hex_color(data["color"]):
                 return jsonify({"error": "Color must be in hex format #RRGGBB"}), 400
-            utilisateur.couleur = data["couleur"]
+            user.color = data["color"]
 
         # Update OIDC subject if provided
         if "sub" in data:
             # Check if sub already exists (excluding current record)
             if data["sub"]:
-                existing = Utilisateur.query.filter(
-                    Utilisateur.sub == data["sub"], Utilisateur.id != id
+                existing = User.query.filter(
+                    User.sub == data["sub"], User.id != id
                 ).first()
                 if existing:
                     return jsonify(
                         {"error": "User with this OIDC subject already exists"}
                     ), 409
-            utilisateur.sub = data["sub"]
+            user.sub = data["sub"]
 
         db.session.commit()
-        return jsonify(utilisateur_schema.dump(utilisateur)), 200
+        return jsonify(user_schema.dump(user)), 200
 
     except IntegrityError:
         db.session.rollback()
@@ -105,19 +105,19 @@ def update_utilisateur(id):
         return jsonify({"error": str(e)}), 500
 
 
-@utilisateur_bp.route("/<int:id>", methods=["DELETE"])
-def delete_utilisateur(id):
+@user_bp.route("/<int:id>", methods=["DELETE"])
+def delete_user(id):
     """Delete a user"""
     try:
-        utilisateur = Utilisateur.query.get_or_404(id)
+        user = User.query.get_or_404(id)
 
-        # Check if there are associated pointages
-        if utilisateur.pointages.count() > 0:
+        # Check if there are associated time entries
+        if user.time_entries.count() > 0:
             return jsonify(
                 {"error": "Cannot delete user with associated time entries"}
             ), 409
 
-        db.session.delete(utilisateur)
+        db.session.delete(user)
         db.session.commit()
 
         return "", 204
@@ -127,17 +127,17 @@ def delete_utilisateur(id):
         return jsonify({"error": str(e)}), 500
 
 
-@utilisateur_bp.route("/export-csv", methods=["GET"])
-def export_utilisateurs_csv():
+@user_bp.route("/export-csv", methods=["GET"])
+def export_users_csv():
     """Export all users as CSV."""
-    utilisateurs = Utilisateur.query.order_by(Utilisateur.nom).all()
+    users = User.query.order_by(User.name).all()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["nom", "couleur", "sub"])
+    writer.writerow(["name", "color", "sub"])
 
-    for utilisateur in utilisateurs:
-        writer.writerow([utilisateur.nom, utilisateur.couleur, utilisateur.sub or ""])
+    for user in users:
+        writer.writerow([user.name, user.color, user.sub or ""])
 
     csv_content = output.getvalue()
     output.close()
@@ -145,12 +145,12 @@ def export_utilisateurs_csv():
     return Response(
         csv_content,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=utilisateurs.csv"},
+        headers={"Content-Disposition": "attachment; filename=users.csv"},
     )
 
 
-@utilisateur_bp.route("/import-csv", methods=["POST"])
-def import_utilisateurs_csv():
+@user_bp.route("/import-csv", methods=["POST"])
+def import_users_csv():
     """Import users from CSV file."""
     try:
         if "file" not in request.files:
@@ -163,12 +163,12 @@ def import_utilisateurs_csv():
         content = csv_file.stream.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
 
-        required_headers = {"nom", "couleur"}
+        required_headers = {"name", "color"}
         if not reader.fieldnames or not required_headers.issubset(
             set(reader.fieldnames)
         ):
             return jsonify(
-                {"error": "CSV header must contain: nom,couleur (sub optional)"}
+                {"error": "CSV header must contain: name,color (sub optional)"}
             ), 400
 
         created = 0
@@ -176,33 +176,33 @@ def import_utilisateurs_csv():
         errors = []
 
         for idx, row in enumerate(reader, start=2):
-            nom = str(row.get("nom", "")).strip()
-            couleur = str(row.get("couleur", "")).strip()
+            name = str(row.get("name", "")).strip()
+            color = str(row.get("color", "")).strip()
             sub = str(row.get("sub", "")).strip() or None
 
-            if not nom or not couleur:
-                errors.append({"line": idx, "error": "nom and couleur are required"})
+            if not name or not color:
+                errors.append({"line": idx, "error": "name and color are required"})
                 continue
 
-            if not validate_hex_color(couleur):
+            if not validate_hex_color(color):
                 errors.append(
-                    {"line": idx, "error": "couleur must be in #RRGGBB format"}
+                    {"line": idx, "error": "color must be in #RRGGBB format"}
                 )
                 continue
 
             target = None
             if sub:
-                target = Utilisateur.query.filter_by(sub=sub).first()
+                target = User.query.filter_by(sub=sub).first()
             if not target:
-                target = Utilisateur.query.filter_by(nom=nom).first()
+                target = User.query.filter_by(name=name).first()
 
             if target:
-                target.nom = nom
-                target.couleur = couleur
+                target.name = name
+                target.color = color
                 if sub:
-                    existing_sub = Utilisateur.query.filter(
-                        Utilisateur.sub == sub,
-                        Utilisateur.id != target.id,
+                    existing_sub = User.query.filter(
+                        User.sub == sub,
+                        User.id != target.id,
                     ).first()
                     if existing_sub:
                         errors.append(
@@ -213,7 +213,7 @@ def import_utilisateurs_csv():
                 updated += 1
             else:
                 existing_sub = (
-                    Utilisateur.query.filter_by(sub=sub).first() if sub else None
+                    User.query.filter_by(sub=sub).first() if sub else None
                 )
                 if existing_sub:
                     errors.append(
@@ -221,7 +221,7 @@ def import_utilisateurs_csv():
                     )
                     continue
 
-                db.session.add(Utilisateur(nom=nom, couleur=couleur, sub=sub))
+                db.session.add(User(name=name, color=color, sub=sub))
                 created += 1
 
         db.session.commit()

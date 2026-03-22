@@ -1,4 +1,8 @@
-# Application de Pointage
+# Time Tracking Application
+
+<p align="center">
+	<img src="docs/assets/timetrack.png" alt="TimeTrack logo" width="220" />
+</p>
 
 ![Backend Flask](https://img.shields.io/badge/Backend-Flask-000000?logo=flask)
 ![Frontend React](https://img.shields.io/badge/Frontend-React-20232A?logo=react)
@@ -6,7 +10,7 @@
 ![Docker Compose](https://img.shields.io/badge/Dev-Docker%20Compose-2496ED?logo=docker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Application web de gestion de pointage (time tracking) pour remplacer les tableaux croisés dynamiques Excel.
+A web application for time tracking management, built to replace Excel pivot tables.
 
 ## Technologies
 
@@ -16,127 +20,127 @@ Application web de gestion de pointage (time tracking) pour remplacer les tablea
 
 ## Architecture
 
-### Modèle de données
+### Data Model
 
-1. **CodePointage**: Code unique de pointage (128 caractères)
-2. **Projet**: Nom de projet unique, lié à un code pointage (relation many-to-one)
-3. **Utilisateur**: Nom, couleur d'identification, support OIDC futur
-4. **Pointage**: Saisie de temps avec nombre de jours, numéro de semaine, année, utilisateur et projet
+1. **TrackingCode**: Unique tracking code (128 characters)
+2. **Project**: Unique project name, linked to a tracking code (many-to-one relationship)
+3. **User**: Name, identification color, future OIDC support
+4. **TimeEntry**: Time entry with number of days, week number, year, user, and project
 
-## Installation rapide
+## Quick Start
 
-Les détails d'installation et de développement ont été déplacés dans la documentation dédiée :
+Installation and development details are available in the dedicated documentation:
 
-- [Guide de développement](docs/README_DEV.md)
+- [Development Guide](docs/README_DEV.md)
 
-### Développement
+### Development
 
-Pour démarrer rapidement en mode développement :
+To start quickly in development mode:
 
 ```bash
 docker compose -f compose.dev.yml up --build --watch
 ```
 
-Services disponibles :
+Available services:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
 - **MariaDB**: localhost:3306
 
 ### Production
 
-1. Préparer le fichier d'environnement :
+1. Prepare the environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Mettre à jour les secrets/valeurs de production dans `.env` (au minimum `MYSQL_*` et `SECRET_KEY`).
+2. Update the production secrets/values in `.env` (at minimum `MYSQL_*` and `SECRET_KEY`).
 
-3. Démarrer la stack production :
+3. Start the production stack:
 
 ```bash
 docker compose -f compose.yml up -d --build
 ```
 
-4. Accéder à l'application :
+4. Access the application:
 
 - **Frontend (Nginx)**: http://localhost
 - **API via frontend**: http://localhost/api/v1
 
-Pour arrêter :
+To stop:
 
 ```bash
 docker compose -f compose.yml down
 ```
 
-Documentation technique (structure du projet + API REST) : [docs/README_DEV.md](docs/README_DEV.md).
+Technical documentation (project structure + REST API): [docs/README_DEV.md](docs/README_DEV.md).
 
-## Captures d'écran
+## Screenshots
 
-### Vue Gantt
+### Gantt View
 
-![Vue Gantt](docs/assets/gantt.png)
+![Gantt View](docs/assets/gantt.png)
 
-### Statistiques
+### Statistics
 
-![Statistiques](docs/assets/stats.png)
+![Statistics](docs/assets/stats.png)
 
 ### Export
 
 ![Export](docs/assets/export.png)
 
-## Fonctionnalités
+## Features
 
-### Codes Pointage
-- Création, modification et suppression de codes de pointage
-- Code unique de 128 caractères maximum
-- Protection contre la suppression si des projets utilisent le code
+### Tracking Codes
+- Create, edit, and delete tracking codes
+- Unique code, up to 128 characters
+- Protected from deletion if projects are using the code
 
-### Projets
-- Gestion des projets avec nom unique
-- Association à un code pointage obligatoire
-- Protection contre la suppression si des pointages existent
+### Projects
+- Manage projects with a unique name
+- Required association to a tracking code
+- Protected from deletion if time entries exist
 
-### Utilisateurs
-- Gestion des utilisateurs avec nom et couleur
-- Sélecteur de couleur visuel (format hexadécimal #RRGGBB)
-- Support OIDC prévu (champ `sub` nullable)
-- Protection contre la suppression si des pointages existent
+### Users
+- Manage users with name and color
+- Visual color picker (hexadecimal format #RRGGBB)
+- Planned OIDC support (`sub` field, nullable)
+- Protected from deletion if time entries exist
 
-### Pointages
-- Saisie de temps par utilisateur et projet
-- Support des demi-journées (décimales : 0.5, 2.5, etc.)
-- Numéro de semaine ISO (1-53)
-- Année de référence
-- Filtrage par année et semaine
-- Contrainte d'unicité : un seul pointage par utilisateur/projet/semaine/année
-- Interface de type tableur pour une saisie rapide
+### Time Entries
+- Time entry per user and project
+- Half-day support (decimals: 0.5, 2.5, etc.)
+- ISO week number (1–53)
+- Reference year
+- Filtering by year and week
+- Uniqueness constraint: one entry per user/project/week/year
+- Spreadsheet-style interface for fast entry
 
-### Import / Export CSV
-- Import CSV pour **Utilisateurs**, **Codes Pointage**, **Projets** et **Pointages**
-- Export CSV pour **Utilisateurs**, **Codes Pointage**, **Projets** et **Pointages**
-- Fichiers CSV d'exemple téléchargeables depuis l'interface :
-	- `/examples/utilisateurs_exemple.csv`
-	- `/examples/codes_pointage_exemple.csv`
-	- `/examples/projets_exemple.csv`
-	- `/examples/pointages_exemple.csv`
+### CSV Import / Export
+- CSV import for **Users**, **Tracking Codes**, **Projects**, and **Time Entries**
+- CSV export for **Users**, **Tracking Codes**, **Projects**, and **Time Entries**
+- Sample CSV files downloadable from the interface:
+	- `/examples/users_example.csv`
+	- `/examples/tracking_codes_example.csv`
+	- `/examples/projects_example.csv`
+	- `/examples/time_entries_example.csv`
 
-## Développement
+## Development
 
-Toute la documentation de développement (setup, seed, exécution locale, type-checking, notes techniques) est disponible dans [docs/README_DEV.md](docs/README_DEV.md).
+All development documentation (setup, seed, local execution, type-checking, technical notes) is available in [docs/README_DEV.md](docs/README_DEV.md).
 
-## Évolutions futures
+## Future Improvements
 
-- [ ] Authentification OIDC
-- [ ] Interface type tableur avancée (AG-Grid)
-- [ ] Rapports et statistiques (agrégations par projet/utilisateur/période)
-- [ ] Gestion des permissions utilisateurs
-- [ ] Soft delete pour l'historique
-- [ ] API de recherche full-text
-- [ ] Notifications et rappels
-- [ ] Ajout d'une fonctionnalité d'export/import COMPLET de la DB
-- [ ] Conversion du repos en anglais avec support i18n
+- [ ] Add a full DB export/import feature
+- [ ] i18n support
+- [ ] OIDC authentication
+- [ ] Advanced spreadsheet-style interface (AG-Grid)
+- [ ] Reports and statistics (aggregations by project/user/period)
+- [ ] User permissions management
+- [ ] Soft delete for history tracking
+- [ ] Full-text search API
+- [ ] Notifications and reminders
 
-## Licence
+## License
 
-Distribué sous licence MIT. Voir [LICENSE](LICENSE).
+Distributed under the MIT license. See [LICENSE](LICENSE).

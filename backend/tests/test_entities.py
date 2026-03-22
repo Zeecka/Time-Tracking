@@ -1,42 +1,42 @@
 """
-Tests for Projet, CodePointage, and Utilisateur routes.
+Tests for Project, TrackingCode, and User routes.
 
 Covers:
  - Basic CRUD for all three resources
- - Referential integrity (cannot delete a CodePointage that has projects)
- - Cannot delete a Projet that has pointages
- - Cannot delete a Utilisateur that has pointages
+ - Referential integrity (cannot delete a TrackingCode that has projects)
+ - Cannot delete a Project that has time entries
+ - Cannot delete a User that has time entries
  - Uniqueness constraints
- - Colour validation
+ - Color validation
 """
 
 import io
 
-BASE_CODE = "/api/v1/code-pointage"
-BASE_PROJ = "/api/v1/projets"
-BASE_USER = "/api/v1/utilisateurs"
-BASE_POINTAGE = "/api/v1/pointages"
+BASE_CODE = "/api/v1/tracking-code"
+BASE_PROJ = "/api/v1/project"
+BASE_USER = "/api/v1/user"
+BASE_ENTRY = "/api/v1/time-entry"
 
 
-def make_week10_pointage(user_id, proj_id):
+def make_week10_time_entry(user_id, project_id):
     return {
-        "utilisateur_id": user_id,
-        "projet_id": proj_id,
-        "date_debut": "2026-03-02",
-        "periode_debut": "matin",
-        "date_fin": "2026-03-02",
-        "periode_fin": "soir",
-        "numero_semaine": 10,
-        "annee": 2026,
+        "user_id": user_id,
+        "project_id": project_id,
+        "start_date": "2026-03-02",
+        "start_period": "morning",
+        "end_date": "2026-03-02",
+        "end_period": "evening",
+        "week_number": 10,
+        "year": 2026,
     }
 
 
 # ---------------------------------------------------------------------------
-# CodePointage
+# TrackingCode
 # ---------------------------------------------------------------------------
 
 
-class TestCodePointageCRUD:
+class TestTrackingCodeCRUD:
     def test_create_code(self, client):
         rv = client.post(BASE_CODE, json={"code": "ALPHA"})
         assert rv.status_code == 201
@@ -68,8 +68,8 @@ class TestCodePointageCRUD:
         rv_del = client.delete(f"{BASE_CODE}/{cid}")
         assert rv_del.status_code == 204
 
-    def test_delete_code_with_projects_blocked(self, client, code_dev, projet_dev):
-        """Deleting a CodePointage that has linked projects must be refused."""
+    def test_delete_code_with_projects_blocked(self, client, code_dev, project_dev):
+        """Deleting a TrackingCode that has linked projects must be refused."""
         rv = client.delete(f"{BASE_CODE}/{code_dev.id}")
         assert rv.status_code == 409
 
@@ -79,173 +79,173 @@ class TestCodePointageCRUD:
 
 
 # ---------------------------------------------------------------------------
-# Projet
+# Project
 # ---------------------------------------------------------------------------
 
 
-class TestProjetCRUD:
+class TestProjectCRUD:
     def test_create_project(self, client, code_dev):
         rv = client.post(
             BASE_PROJ,
             json={
-                "nom": "Mon Projet",
-                "couleur": "#ff5733",
-                "motif": "uni",
-                "code_pointage_id": code_dev.id,
+                "name": "My Project",
+                "color": "#ff5733",
+                "pattern": "solid",
+                "tracking_code_id": code_dev.id,
             },
         )
         assert rv.status_code == 201
-        assert rv.get_json()["nom"] == "Mon Projet"
+        assert rv.get_json()["name"] == "My Project"
 
-    def test_list_projects(self, client, projet_dev):
+    def test_list_projects(self, client, project_dev):
         rv = client.get(BASE_PROJ)
         assert rv.status_code == 200
-        assert any(p["nom"] == "Développement" for p in rv.get_json())
+        assert any(p["name"] == "Development" for p in rv.get_json())
 
-    def test_update_project_colour_and_motif(self, client, projet_dev):
+    def test_update_project_color_and_pattern(self, client, project_dev):
         rv = client.put(
-            f"{BASE_PROJ}/{projet_dev.id}",
-            json={"couleur": "#1abc9c", "motif": "raye"},
+            f"{BASE_PROJ}/{project_dev.id}",
+            json={"color": "#1abc9c", "pattern": "striped"},
         )
         assert rv.status_code == 200
         data = rv.get_json()
-        assert data["couleur"] == "#1abc9c"
-        assert data["motif"] == "raye"
+        assert data["color"] == "#1abc9c"
+        assert data["pattern"] == "striped"
 
-    def test_invalid_motif_rejected(self, client, code_dev):
+    def test_invalid_pattern_rejected(self, client, code_dev):
         rv = client.post(
             BASE_PROJ,
             json={
-                "nom": "Motif Invalide",
-                "couleur": "#aabbcc",
-                "motif": "zigzag",
-                "code_pointage_id": code_dev.id,
+                "name": "Invalid Pattern",
+                "color": "#aabbcc",
+                "pattern": "zigzag",
+                "tracking_code_id": code_dev.id,
             },
         )
         assert rv.status_code == 400
 
-    def test_duplicate_project_name_rejected(self, client, code_dev, projet_dev):
+    def test_duplicate_project_name_rejected(self, client, code_dev, project_dev):
         rv = client.post(
             BASE_PROJ,
             json={
-                "nom": "Développement",
-                "couleur": "#000000",
-                "motif": "uni",
-                "code_pointage_id": code_dev.id,
+                "name": "Development",
+                "color": "#000000",
+                "pattern": "solid",
+                "tracking_code_id": code_dev.id,
             },
         )
         assert rv.status_code == 409
 
-    def test_delete_project_without_pointages(self, client, code_dev):
+    def test_delete_project_without_time_entries(self, client, code_dev):
         rv = client.post(
             BASE_PROJ,
             json={
-                "nom": "Temporaire",
-                "couleur": "#ffffff",
-                "motif": "uni",
-                "code_pointage_id": code_dev.id,
+                "name": "Temporary",
+                "color": "#ffffff",
+                "pattern": "solid",
+                "tracking_code_id": code_dev.id,
             },
         )
         pid = rv.get_json()["id"]
         rv_del = client.delete(f"{BASE_PROJ}/{pid}")
         assert rv_del.status_code == 204
 
-    def test_delete_project_with_pointages_blocked(
-        self, client, projet_dev, utilisateur_alice
+    def test_delete_project_with_time_entries_blocked(
+        self, client, project_dev, user_alice
     ):
-        """Cannot delete a project that still has pointages."""
+        """Cannot delete a project that still has time entries."""
         client.post(
-            BASE_POINTAGE,
-            json=make_week10_pointage(utilisateur_alice.id, projet_dev.id),
+            BASE_ENTRY,
+            json=make_week10_time_entry(user_alice.id, project_dev.id),
         )
-        rv = client.delete(f"{BASE_PROJ}/{projet_dev.id}")
+        rv = client.delete(f"{BASE_PROJ}/{project_dev.id}")
         assert rv.status_code == 409
 
     def test_project_nonexistent_code_rejected(self, client):
         rv = client.post(
             BASE_PROJ,
             json={
-                "nom": "Orphan",
-                "couleur": "#aaaaaa",
-                "motif": "uni",
-                "code_pointage_id": 99999,
+                "name": "Orphan",
+                "color": "#aaaaaa",
+                "pattern": "solid",
+                "tracking_code_id": 99999,
             },
         )
-        assert rv.status_code in (400, 404)  # implementation may return either
+        assert rv.status_code in (400, 404)
 
 
 # ---------------------------------------------------------------------------
-# Utilisateur
+# User
 # ---------------------------------------------------------------------------
 
 
-class TestUtilisateurCRUD:
+class TestUserCRUD:
     def test_create_user(self, client):
         rv = client.post(
             BASE_USER,
-            json={"nom": "Claire", "couleur": "#f39c12"},
+            json={"name": "Claire", "color": "#f39c12"},
         )
         assert rv.status_code == 201
-        assert rv.get_json()["nom"] == "Claire"
+        assert rv.get_json()["name"] == "Claire"
 
-    def test_list_users(self, client, utilisateur_alice):
+    def test_list_users(self, client, user_alice):
         rv = client.get(BASE_USER)
         assert rv.status_code == 200
-        assert any(u["nom"] == "Alice" for u in rv.get_json())
+        assert any(u["name"] == "Alice" for u in rv.get_json())
 
-    def test_update_user_name_and_colour(self, client, utilisateur_alice):
+    def test_update_user_name_and_color(self, client, user_alice):
         rv = client.put(
-            f"{BASE_USER}/{utilisateur_alice.id}",
-            json={"nom": "Alice Martin", "couleur": "#27ae60"},
+            f"{BASE_USER}/{user_alice.id}",
+            json={"name": "Alice Martin", "color": "#27ae60"},
         )
         assert rv.status_code == 200
         data = rv.get_json()
-        assert data["nom"] == "Alice Martin"
-        assert data["couleur"] == "#27ae60"
+        assert data["name"] == "Alice Martin"
+        assert data["color"] == "#27ae60"
 
-    def test_invalid_colour_format_rejected(self, client):
+    def test_invalid_color_format_rejected(self, client):
         rv = client.post(
             BASE_USER,
-            json={"nom": "MauvaiseCouleur", "couleur": "rouge"},
+            json={"name": "BadColor", "color": "red"},
         )
         assert rv.status_code == 400
 
-    def test_delete_user_without_pointages(self, client):
+    def test_delete_user_without_time_entries(self, client):
         rv = client.post(
             BASE_USER,
-            json={"nom": "TemporaireUser", "couleur": "#cccccc"},
+            json={"name": "TemporaryUser", "color": "#cccccc"},
         )
         uid = rv.get_json()["id"]
         rv_del = client.delete(f"{BASE_USER}/{uid}")
         assert rv_del.status_code == 204
 
-    def test_delete_user_with_pointages_blocked(
-        self, client, utilisateur_alice, projet_dev
+    def test_delete_user_with_time_entries_blocked(
+        self, client, user_alice, project_dev
     ):
-        """Cannot delete a user that still has pointages."""
+        """Cannot delete a user that still has time entries."""
         client.post(
-            BASE_POINTAGE,
-            json=make_week10_pointage(utilisateur_alice.id, projet_dev.id),
+            BASE_ENTRY,
+            json=make_week10_time_entry(user_alice.id, project_dev.id),
         )
-        rv = client.delete(f"{BASE_USER}/{utilisateur_alice.id}")
+        rv = client.delete(f"{BASE_USER}/{user_alice.id}")
         assert rv.status_code == 409
 
     def test_duplicate_sub_rejected(self, client):
         """Two users with the same OIDC sub must be rejected."""
         client.post(
             BASE_USER,
-            json={"nom": "UserA", "couleur": "#aaaaaa", "sub": "oidc|abc123"},
+            json={"name": "UserA", "color": "#aaaaaa", "sub": "oidc|abc123"},
         )
         rv = client.post(
             BASE_USER,
-            json={"nom": "UserB", "couleur": "#bbbbbb", "sub": "oidc|abc123"},
+            json={"name": "UserB", "color": "#bbbbbb", "sub": "oidc|abc123"},
         )
         assert rv.status_code == 409
 
     def test_null_sub_allowed_multiple(self, client):
         """Multiple users may have sub=None (unique nullable constraint)."""
-        rv1 = client.post(BASE_USER, json={"nom": "NoSub1", "couleur": "#111111"})
-        rv2 = client.post(BASE_USER, json={"nom": "NoSub2", "couleur": "#222222"})
+        rv1 = client.post(BASE_USER, json={"name": "NoSub1", "color": "#111111"})
+        rv2 = client.post(BASE_USER, json={"name": "NoSub2", "color": "#222222"})
         assert rv1.status_code == 201
         assert rv2.status_code == 201
 
@@ -269,8 +269,8 @@ class TestCsvImportExport:
         data = rv.get_json()
         assert data["created"] == 2
 
-    def test_import_utilisateur_csv_create_and_update(self, client, utilisateur_alice):
-        csv_content = "nom,couleur,sub\nAlice,#ff0000,\nClaire,#123456,oidc|claire\n"
+    def test_import_user_csv_create_and_update(self, client, user_alice):
+        csv_content = "name,color,sub\nAlice,#ff0000,\nClaire,#123456,oidc|claire\n"
         rv = client.post(
             f"{BASE_USER}/import-csv",
             data={"file": (io.BytesIO(csv_content.encode("utf-8")), "users.csv")},
@@ -281,9 +281,9 @@ class TestCsvImportExport:
         assert data["updated"] == 1
         assert data["created"] == 1
 
-    def test_import_projet_csv(self, client, code_dev):
+    def test_import_project_csv(self, client, code_dev):
         csv_content = (
-            "nom,couleur,motif,code_pointage\nOnboarding,#abcdef,pointille,DEV\n"
+            "name,color,pattern,tracking_code\nOnboarding,#abcdef,dotted,DEV\n"
         )
         rv = client.post(
             f"{BASE_PROJ}/import-csv",
@@ -293,3 +293,35 @@ class TestCsvImportExport:
         assert rv.status_code == 201
         data = rv.get_json()
         assert data["created"] == 1
+
+    def test_import_project_csv_with_unknown_tracking_code(self, client, code_dev):
+        csv_content = (
+            "name,color,pattern,tracking_code\nOnboarding,#abcdef,dotted,UNKNOWN\n"
+        )
+        rv = client.post(
+            f"{BASE_PROJ}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.csv")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data["created"] == 0
+        assert len(data["errors"]) == 1
+        assert "tracking_code not found" in data["errors"][0]["error"]
+
+    def test_import_project_excel_like_file_with_valid_csv_content(
+        self, client, code_dev
+    ):
+        csv_content = "name,color,pattern,tracking_code\nRoadmap,#112233,solid,DEV\n"
+        rv = client.post(
+            f"{BASE_PROJ}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 1
+        assert data["updated"] == 0
+        assert len(data["errors"]) == 0

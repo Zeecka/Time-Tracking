@@ -1,62 +1,62 @@
 from app.extensions import ma
-from app.models import CodePointage, Pointage, Projet, Utilisateur
+from app.models import Project, TimeEntry, TrackingCode, User
 
 
-class CodePointageSchema(ma.SQLAlchemyAutoSchema):
+class TrackingCodeSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        model = CodePointage
+        model = TrackingCode
         load_instance = True
         include_fk = True
 
 
-class ProjetSchema(ma.SQLAlchemyAutoSchema):
-    code_pointage = ma.Nested(CodePointageSchema, only=["id", "code"])
+class ProjectSchema(ma.SQLAlchemyAutoSchema):
+    tracking_code = ma.Nested(TrackingCodeSchema, only=["id", "code"])
 
     class Meta:
-        model = Projet
+        model = Project
         load_instance = True
         include_fk = True
         fields = (
             "id",
-            "nom",
-            "couleur",
-            "motif",
-            "code_pointage_id",
+            "name",
+            "color",
+            "pattern",
+            "tracking_code_id",
             "created_at",
             "updated_at",
-            "code_pointage",
+            "tracking_code",
         )
 
 
-class UtilisateurSchema(ma.SQLAlchemyAutoSchema):
+class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        model = Utilisateur
+        model = User
         load_instance = True
         include_fk = True
 
 
-class PointageSchema(ma.SQLAlchemyAutoSchema):
-    utilisateur = ma.Nested(UtilisateurSchema, only=["id", "nom", "couleur"])
-    projet = ma.Nested(
-        ProjetSchema,
-        only=["id", "nom", "couleur", "motif", "code_pointage_id", "code_pointage"],
+class TimeEntrySchema(ma.SQLAlchemyAutoSchema):
+    user = ma.Nested(UserSchema, only=["id", "name", "color"])
+    project = ma.Nested(
+        ProjectSchema,
+        only=["id", "name", "color", "pattern", "tracking_code_id", "tracking_code"],
     )
 
     class Meta:
-        model = Pointage
+        model = TimeEntry
         load_instance = True
         include_fk = True
 
 
 # Schema instances
-code_pointage_schema = CodePointageSchema()
-code_pointages_schema = CodePointageSchema(many=True)
+tracking_code_schema = TrackingCodeSchema()
+tracking_codes_schema = TrackingCodeSchema(many=True)
 
-projet_schema = ProjetSchema()
-projets_schema = ProjetSchema(many=True)
+project_schema = ProjectSchema()
+projects_schema = ProjectSchema(many=True)
 
-utilisateur_schema = UtilisateurSchema()
-utilisateurs_schema = UtilisateurSchema(many=True)
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
 
-pointage_schema = PointageSchema()
-pointages_schema = PointageSchema(many=True)
+time_entry_schema = TimeEntrySchema()
+time_entries_schema = TimeEntrySchema(many=True)

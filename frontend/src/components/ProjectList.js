@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, Button, Modal, Form, Alert } from 'react-bootstrap';
-import { projetAPI, codePointageAPI } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import { projectAPI, trackingCodeAPI } from '../services/api';
 
-const getMotifStyle = (couleur, motif) => {
-  const baseColor = couleur || '#3498db';
-  if (motif === 'raye') {
+const getPatternStyle = (color, pattern) => {
+  const baseColor = color || '#3498db';
+  if (pattern === 'striped') {
     return {
       backgroundColor: baseColor,
       backgroundImage: `repeating-linear-gradient(45deg, ${baseColor} 0px, ${baseColor} 5px, rgba(255, 255, 255, 0.45) 5px, rgba(255, 255, 255, 0.45) 9px)`,
     };
   }
-  if (motif === 'pointille') {
+  if (pattern === 'dotted') {
     return {
       backgroundColor: baseColor,
       backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.65) 18%, transparent 20%)`,
@@ -20,56 +21,57 @@ const getMotifStyle = (couleur, motif) => {
   return { backgroundColor: baseColor };
 };
 
-function ProjetList() {
-  const [projets, setProjets] = useState([]);
-  const [codePointages, setCodePointages] = useState([]);
+function ProjectList() {
+  const { t } = useTranslation();
+  const [projects, setProjects] = useState([]);
+  const [trackingCodes, setTrackingCodes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ nom: '', code_pointage_id: '', couleur: '#3498db', motif: 'uni' });
+  const [formData, setFormData] = useState({ name: '', tracking_code_id: '', color: '#3498db', pattern: 'solid' });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const importInputRef = useRef(null);
 
-  useEffect(() => {
-    loadProjets();
-    loadCodePointages();
-  }, []);
-
-  const loadProjets = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await projetAPI.getAll();
-      setProjets(response.data);
+      const response = await projectAPI.getAll();
+      setProjects(response.data);
     } catch (err) {
-      setError('Erreur lors du chargement des projets');
+      setError(t('project.errorLoad'));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  const loadCodePointages = async () => {
+  const loadTrackingCodes = useCallback(async () => {
     try {
-      const response = await codePointageAPI.getAll();
-      setCodePointages(response.data);
+      const response = await trackingCodeAPI.getAll();
+      setTrackingCodes(response.data);
     } catch (err) {
-      console.error('Erreur lors du chargement des codes pointage', err);
+      console.error('Error loading tracking codes', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProjects();
+    loadTrackingCodes();
+  }, [loadProjects, loadTrackingCodes]);
 
   const handleShowModal = (item = null) => {
     if (item) {
       setEditingItem(item);
       setFormData({
-        nom: item.nom,
-        code_pointage_id: item.code_pointage_id,
-        couleur: item.couleur,
-        motif: item.motif || 'uni',
+        name: item.name,
+        tracking_code_id: item.tracking_code_id,
+        color: item.color,
+        pattern: item.pattern || 'solid',
       });
     } else {
       setEditingItem(null);
-      setFormData({ nom: '', code_pointage_id: '', couleur: '#3498db', motif: 'uni' });
+      setFormData({ name: '', tracking_code_id: '', color: '#3498db', pattern: 'solid' });
     }
     setShowModal(true);
     setError('');
@@ -78,7 +80,7 @@ function ProjetList() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingItem(null);
-    setFormData({ nom: '', code_pointage_id: '', couleur: '#3498db', motif: 'uni' });
+    setFormData({ name: '', tracking_code_id: '', color: '#3498db', pattern: 'solid' });
     setError('');
   };
 
@@ -87,28 +89,28 @@ function ProjetList() {
     try {
       const data = {
         ...formData,
-        code_pointage_id: parseInt(formData.code_pointage_id),
+        tracking_code_id: parseInt(formData.tracking_code_id),
       };
 
       if (editingItem) {
-        await projetAPI.update(editingItem.id, data);
+        await projectAPI.update(editingItem.id, data);
       } else {
-        await projetAPI.create(data);
+        await projectAPI.create(data);
       }
       handleCloseModal();
-      loadProjets();
+      loadProjects();
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de la sauvegarde');
+      setError(err.response?.data?.error || t('project.errorSave'));
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) {
+    if (window.confirm(t('project.deleteConfirm', { name: projects.find((p) => p.id === id)?.name || '' }))) {
       try {
-        await projetAPI.delete(id);
-        loadProjets();
+        await projectAPI.delete(id);
+        loadProjects();
       } catch (err) {
-        setError(err.response?.data?.error || 'Erreur lors de la suppression');
+        setError(err.response?.data?.error || t('project.errorDelete'));
       }
     }
   };
@@ -126,11 +128,11 @@ function ProjetList() {
 
   const handleExportCSV = async () => {
     try {
-      const response = await projetAPI.exportCSV();
-      downloadBlob(response.data, 'projets.csv');
-      setMessage('Export CSV des projets terminé.');
+      const response = await projectAPI.exportCSV();
+      downloadBlob(response.data, 'projects.csv');
+      setMessage(t('project.exportCsvSuccess') || 'CSV export done.');
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l’export CSV');
+      setError(err.response?.data?.error || t('project.errorExportCsv'));
     }
   };
 
@@ -145,14 +147,14 @@ function ProjetList() {
     }
 
     try {
-      const response = await projetAPI.importCSV(file);
+      const response = await projectAPI.importCSV(file);
       const data = response.data || {};
       setMessage(
-        `Import CSV projets : ${data.created || 0} créé(s), ${data.updated || 0} mis à jour, ${(data.errors || []).length} erreur(s).`
+        t('project.importSuccess', { created: data.created || 0, updated: data.updated || 0 })
       );
-      await Promise.all([loadProjets(), loadCodePointages()]);
+      await Promise.all([loadProjects(), loadTrackingCodes()]);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l’import CSV');
+      setError(err.response?.data?.error || t('project.errorImportCsv'));
     } finally {
       e.target.value = '';
     }
@@ -163,26 +165,26 @@ function ProjetList() {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0" style={{ fontWeight: 700 }}>
           <i className="fas fa-folder-open me-2" style={{ color: '#f39c12' }}></i>
-          Projets
+          {t('project.title')}
         </h2>
         <Button variant="primary" onClick={() => handleShowModal()}>
           <i className="fas fa-plus me-2"></i>
-          Nouveau Projet
+          {t('project.new')}
         </Button>
       </div>
 
       <div className="d-flex gap-2 mb-3">
         <Button variant="outline-primary" size="sm" onClick={handleImportClick}>
           <i className="fas fa-file-import me-2"></i>
-          Import CSV
+          {t('project.importCsv')}
         </Button>
         <Button variant="outline-success" size="sm" onClick={handleExportCSV}>
           <i className="fas fa-file-export me-2"></i>
-          Export CSV
+          {t('project.exportCsv')}
         </Button>
-        <Button variant="outline-secondary" size="sm" as="a" href="/examples/projets_exemple.csv" download>
+        <Button variant="outline-secondary" size="sm" as="a" href="/examples/projects_example.csv" download>
           <i className="fas fa-download me-2"></i>
-          CSV exemple
+          {t('common.csvExample') || 'CSV example'}
         </Button>
         <Form.Control
           ref={importInputRef}
@@ -197,18 +199,18 @@ function ProjetList() {
       {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
 
       {loading ? (
-        <p>Chargement...</p>
+        <p>{t('common.loading')}</p>
       ) : (
-        <Table striped bordered hover className="projet-table">
+        <Table striped bordered hover className="project-table">
           <thead>
             <tr>
-              <th style={{ fontFamily: 'monospace', textAlign: 'center', verticalAlign: 'middle' }}>Nom du projet</th>
-              <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>Code pointage</th>
-              <th style={{ textAlign: 'center', verticalAlign: 'middle' }}>Actions</th>
+              <th style={{ fontFamily: 'monospace', textAlign: 'center', verticalAlign: 'middle' }}>{t('project.name')}</th>
+              <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>{t('project.trackingCode')}</th>
+              <th style={{ textAlign: 'center', verticalAlign: 'middle' }}>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {projets.map((item) => (
+            {projects.map((item) => (
               <tr key={item.id}>
                 <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>
                   <div className="d-flex align-items-center justify-content-center gap-2">
@@ -219,20 +221,20 @@ function ProjetList() {
                         borderRadius: '3px',
                         border: '1px solid #999',
                         flexShrink: 0,
-                        ...getMotifStyle(item.couleur, item.motif || 'uni'),
+                        ...getPatternStyle(item.color, item.pattern || 'solid'),
                       }}
-                      title={`${item.couleur} · ${item.motif || 'uni'}`}
+                      title={`${item.color} · ${item.pattern || 'solid'}`}
                     />
-                    <span>{item.nom}</span>
+                    <span>{item.name}</span>
                   </div>
                 </td>
-                <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>{item.code_pointage?.code || 'N/A'}</td>
+                <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>{item.tracking_code?.code || 'N/A'}</td>
                 <td style={{ textAlign: 'center' }}>
                   <div className="d-flex align-items-center justify-content-center gap-2">
                     <Button
                       variant="outline-warning"
                       size="sm"
-                      title="Modifier"
+                      title={t('common.edit')}
                       onClick={() => handleShowModal(item)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -242,7 +244,7 @@ function ProjetList() {
                     <Button
                       variant="outline-danger"
                       size="sm"
-                      title="Supprimer"
+                      title={t('common.delete')}
                       onClick={() => handleDelete(item.id)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -260,52 +262,52 @@ function ProjetList() {
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
           <Modal.Title>
-            {editingItem ? 'Modifier' : 'Nouveau'} Projet
+            {editingItem ? t('project.edit') : t('project.create')}
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
             {error && <Alert variant="danger">{error}</Alert>}
             <Form.Group className="mb-3">
-              <Form.Label>Nom du projet</Form.Label>
+              <Form.Label>{t('project.name')}</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                placeholder="Entrez le nom du projet"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('project.namePlaceholder')}
                 required
                 maxLength={128}
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Code pointage</Form.Label>
+              <Form.Label>{t('project.trackingCode')}</Form.Label>
               <Form.Select
-                value={formData.code_pointage_id}
-                onChange={(e) => setFormData({ ...formData, code_pointage_id: e.target.value })}
+                value={formData.tracking_code_id}
+                onChange={(e) => setFormData({ ...formData, tracking_code_id: e.target.value })}
                 required
               >
-                <option value="">Sélectionnez un code</option>
-                {codePointages.map((cp) => (
-                  <option key={cp.id} value={cp.id}>
-                    {cp.code}
+                <option value="">{t('common.selectCode') || 'Select a code'}</option>
+                {trackingCodes.map((tc) => (
+                  <option key={tc.id} value={tc.id}>
+                    {tc.code}
                   </option>
                 ))}
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Couleur du projet</Form.Label>
+              <Form.Label>{t('project.color')}</Form.Label>
               <div className="d-flex gap-2 align-items-center">
                 <Form.Control
                   type="color"
-                  value={formData.couleur}
-                  onChange={(e) => setFormData({ ...formData, couleur: e.target.value })}
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                   className="p-2"
                   style={{ width: '80px', height: '40px', cursor: 'pointer' }}
                 />
                 <Form.Control
                   type="text"
-                  value={formData.couleur}
-                  onChange={(e) => setFormData({ ...formData, couleur: e.target.value })}
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                   placeholder="#3498db"
                   maxLength={7}
                   pattern="^#[0-9A-Fa-f]{6}$"
@@ -313,24 +315,24 @@ function ProjetList() {
               </div>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Motif</Form.Label>
+              <Form.Label>{t('project.pattern')}</Form.Label>
               <Form.Select
-                value={formData.motif}
-                onChange={(e) => setFormData({ ...formData, motif: e.target.value })}
+                value={formData.pattern}
+                onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
                 required
               >
-                <option value="uni">Uni</option>
-                <option value="raye">Rayé</option>
-                <option value="pointille">Pointillé</option>
+                <option value="solid">{t('project.patterns.solid')}</option>
+                <option value="striped">{t('project.patterns.striped')}</option>
+                <option value="dotted">{t('project.patterns.dotted')}</option>
               </Form.Select>
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseModal}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button variant="primary" type="submit">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </Modal.Footer>
         </Form>
@@ -339,4 +341,4 @@ function ProjetList() {
   );
 }
 
-export default ProjetList;
+export default ProjectList;

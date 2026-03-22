@@ -1,0 +1,4 @@
+name,color,pattern,tracking_code
+Development,#3498db,solid,DEV
+Bug Fix,#e74c3c,striped,DEV
+Absence,#95a5a6,dotted,ABS

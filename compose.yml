@@ -3,11 +3,8 @@ services:
     image: mariadb:11.2
     container_name: pointage_db
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    env_file:
+      - .env
     volumes:
       - mariadb_data:/var/lib/mysql
     networks:
@@ -25,13 +22,12 @@ services:
       dockerfile: Dockerfile
     container_name: pointage_backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       FLASK_APP: app
       FLASK_ENV: production
       DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
-      SECRET_KEY: ${SECRET_KEY}
-      CORS_ORIGINS: http://localhost
-      STATS_EXCLUDE_PROJETS: ${STATS_EXCLUDE_PROJETS:-}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -47,6 +43,10 @@ services:
         REACT_APP_API_URL: /api/v1
     container_name: pointage_frontend
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_LANGUAGE: ${APP_LANGUAGE:-en}
     ports:
       - "80:80"
     depends_on:

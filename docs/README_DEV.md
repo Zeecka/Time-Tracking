@@ -1,212 +1,224 @@
-# Guide de développement
+# Development Guide
 
-Cette documentation regroupe toutes les informations techniques utiles au développement local.
+This documentation covers all technical information useful for local development.
 
-## Structure du projet
+## Project Structure
 
 ```
 pointage/
-├── compose.dev.yml            # Orchestration dev (watch + reload)
-├── compose.yml                # Orchestration standard
-├── package.json               # Scripts utilitaires racine
-├── README.md                  # Documentation principale
-├── backend/                   # Application Flask
+├── compose.dev.yml            # Dev orchestration (watch + reload)
+├── compose.yml                # Standard orchestration
+├── package.json               # Root utility scripts
+├── README.md                  # Main documentation
+├── backend/                   # Flask application
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
-│       ├── __init__.py       # Factory Flask
+│       ├── __init__.py       # Flask factory
 │       ├── config.py         # Configuration
-│       ├── models.py         # Modèles SQLAlchemy
-│       ├── schemas.py        # Schémas Marshmallow
-│       ├── extensions.py     # Extensions Flask
-│       └── routes/           # Blueprints API REST
-│           ├── code_pointage.py
-│           ├── projet.py
-│           ├── utilisateur.py
-│           └── pointage.py
-├── frontend/                  # Application React
+│       ├── models.py         # SQLAlchemy models
+│       ├── schemas.py        # Marshmallow schemas
+│       ├── extensions.py     # Flask extensions
+│       └── routes/           # REST API blueprints
+│           ├── tracking_code.py
+│           ├── project.py
+│           ├── user.py
+│           ├── time_entry.py
+│           └── stats.py
+├── frontend/                  # React application
 │   ├── Dockerfile
 │   ├── package.json
 │   ├── public/
 │   └── src/
-│       ├── App.js            # Application principale
-│       ├── index.js          # Point d'entrée
+│       ├── App.js            # Main application
+│       ├── index.js          # Entry point
 │       ├── services/
-│       │   └── api.js        # Client API Axios
-│       └── components/       # Composants React
+│       │   └── api.js        # Axios API client
+│       └── components/       # React components
 └── docs/
-    └── assets/               # Captures d'écran et ressources
+    └── assets/               # Screenshots and resources
 ```
 
-## API REST
+## REST API
 
 ### Endpoints
 
-Toutes les routes API sont préfixées par `/api/v1`.
+All API routes are prefixed with `/api/v1`.
 
-#### Code Pointage
-- `GET /api/v1/code-pointage` - Liste tous les codes
-- `GET /api/v1/code-pointage/{id}` - Détails d'un code
-- `POST /api/v1/code-pointage` - Créer un code
-- `PUT /api/v1/code-pointage/{id}` - Modifier un code
-- `DELETE /api/v1/code-pointage/{id}` - Supprimer un code
+#### Tracking Codes
+- `GET /api/v1/tracking-codes` - List all codes
+- `GET /api/v1/tracking-codes/{id}` - Get code details
+- `POST /api/v1/tracking-codes` - Create a code
+- `PUT /api/v1/tracking-codes/{id}` - Update a code
+- `DELETE /api/v1/tracking-codes/{id}` - Delete a code
+- `GET /api/v1/tracking-codes/export-csv` - Export codes as CSV
+- `POST /api/v1/tracking-codes/import-csv` - Import codes from CSV
 
-#### Projets
-- `GET /api/v1/projets` - Liste tous les projets
-- `GET /api/v1/projets/{id}` - Détails d'un projet
-- `POST /api/v1/projets` - Créer un projet
-- `PUT /api/v1/projets/{id}` - Modifier un projet
-- `DELETE /api/v1/projets/{id}` - Supprimer un projet
+#### Projects
+- `GET /api/v1/projects` - List all projects
+- `GET /api/v1/projects/{id}` - Get project details
+- `POST /api/v1/projects` - Create a project
+- `PUT /api/v1/projects/{id}` - Update a project
+- `DELETE /api/v1/projects/{id}` - Delete a project
+- `GET /api/v1/projects/export-csv` - Export projects as CSV
+- `POST /api/v1/projects/import-csv` - Import projects from CSV
 
-#### Utilisateurs
-- `GET /api/v1/utilisateurs` - Liste tous les utilisateurs
-- `GET /api/v1/utilisateurs/{id}` - Détails d'un utilisateur
-- `POST /api/v1/utilisateurs` - Créer un utilisateur
-- `PUT /api/v1/utilisateurs/{id}` - Modifier un utilisateur
-- `DELETE /api/v1/utilisateurs/{id}` - Supprimer un utilisateur
+#### Users
+- `GET /api/v1/users` - List all users
+- `GET /api/v1/users/{id}` - Get user details
+- `POST /api/v1/users` - Create a user
+- `PUT /api/v1/users/{id}` - Update a user
+- `DELETE /api/v1/users/{id}` - Delete a user
+- `GET /api/v1/users/export-csv` - Export users as CSV
+- `POST /api/v1/users/import-csv` - Import users from CSV
 
-#### Pointages
-- `GET /api/v1/pointages` - Liste tous les pointages (avec filtres optionnels)
-- `GET /api/v1/pointages/{id}` - Détails d'un pointage
-- `POST /api/v1/pointages` - Créer un pointage
-- `POST /api/v1/pointages/bulk` - Créer plusieurs pointages
-- `PUT /api/v1/pointages/{id}` - Modifier un pointage
-- `DELETE /api/v1/pointages/{id}` - Supprimer un pointage
+#### Time Entries
+- `GET /api/v1/time-entries` - List all time entries (with optional filters)
+- `GET /api/v1/time-entries/{id}` - Get time entry details
+- `POST /api/v1/time-entries` - Create a time entry
+- `POST /api/v1/time-entries/bulk` - Create multiple time entries
+- `PUT /api/v1/time-entries/{id}` - Update a time entry
+- `DELETE /api/v1/time-entries/{id}` - Delete a time entry
+- `GET /api/v1/time-entries/export-csv` - Export time entries as CSV
+- `POST /api/v1/time-entries/import-csv` - Import time entries from CSV
 
-#### Filtres disponibles pour les pointages
-- `utilisateur_id` - Filtrer par utilisateur
-- `projet_id` - Filtrer par projet
-- `numero_semaine` - Filtrer par numéro de semaine
-- `annee` - Filtrer par année
+#### Stats
+- `GET /api/v1/stats` - Aggregated statistics
 
-## Prérequis
+#### Available filters for time entries
+- `user_id` - Filter by user
+- `project_id` - Filter by project
+- `week_number` - Filter by week number
+- `year` - Filter by year
+
+## Prerequisites
 
 - Docker
 - Docker Compose
 
 ## Configuration
 
-1. Copiez le fichier d'environnement :
+1. Copy the environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Modifiez `.env` selon vos besoins (optionnel pour le développement)
+2. Edit `.env` as needed (optional for development)
 
-## Démarrage avec Docker Compose
+## Starting with Docker Compose
 
 ```bash
-# Construire et démarrer tous les services
+# Build and start all services
 docker compose -f compose.yml up --build
 
-# Ou en arrière-plan
+# Or in the background
 docker compose -f compose.yml up -d --build
 ```
 
-## Mode développement (watch + reload live)
+## Development Mode (watch + live reload)
 
 ```bash
-# Docker Compose v2 (recommandé)
+# Docker Compose v2 (recommended)
 docker compose -f compose.dev.yml up --build --watch
 ```
 
-Ce mode active :
-- **Backend Flask** en `--debug` (reload auto à chaque changement)
-- **Frontend React** avec rechargement à chaud
-- **Watch Docker Compose** (sync des fichiers + rebuild si dépendances changent)
+This mode enables:
+- **Flask backend** in `--debug` mode (auto-reload on every change)
+- **React frontend** with hot reload
+- **Docker Compose watch** (file sync + rebuild when dependencies change)
 
-Les services seront disponibles sur :
+Services will be available at:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
 - **MariaDB**: localhost:3306
 
-## Initialisation de la base de données
+## Database Initialization
 
 ```bash
-# Se connecter au conteneur backend
+# Connect to the backend container
 docker exec -it pointage_backend bash
 
-# Les tables sont créées automatiquement au démarrage de l'application
+# Tables are created automatically on application startup
 flask seed-dev
 
-# En cas d'évolution du schéma (sans migrations), réinitialiser la base
+# If the schema changes (no migration tool), reset the database
 flask init-db --reset
 flask seed-dev
 ```
 
-## Arrêt des services
+## Stopping Services
 
 ```bash
 docker compose -f compose.yml down
 
-# Avec suppression des volumes (données)
+# Also remove volumes (data)
 docker compose -f compose.yml down -v
 ```
 
-## Données de développement (`seed-dev`)
+## Development Data (`seed-dev`)
 
-La commande `flask seed-dev` peuple la base avec un jeu de données complet couvrant toutes les fonctionnalités de l'application.
+The `flask seed-dev` command populates the database with a complete dataset covering all application features.
 
-### Codes de pointage (7)
+### Tracking Codes (7)
 
-| Code | Rôle |
+| Code | Role |
 |------|------|
-| `DEV` | Développement |
-| `BUG` | Correction de bugs |
-| `DOC` | Documentation / Formation |
-| `RUN` | Infrastructure / Opérations |
-| `MEET` | Réunions / Rituels |
+| `DEV` | Development |
+| `BUG` | Bug fixes |
+| `DOC` | Documentation / Training |
+| `RUN` | Infrastructure / Operations |
+| `MEET` | Meetings / Rituals |
 | `ABS` | Absences |
-| `ARCV` | Code archivé sans projet (teste la suppression sans conflit 409) |
+| `ARCV` | Archived code with no project (tests deletion without 409 conflict) |
 
-### Projets (11)
+### Projects (11)
 
-| Projet | Code | Motif | Particularité |
-|--------|------|-------|---------------|
-| Portail Client | DEV | uni | — |
-| API Facturation | BUG | pointille | — |
-| Application Mobile | DEV | pointille | — |
-| Refonte UI | DOC | uni | — |
-| Infra CI/CD | RUN | uni | — |
-| Rituels Equipe | MEET | pointille | — |
-| Jour Férié | ABS | raye | Absence |
-| RTT | ABS | raye | Absence |
-| Arrêt Maladie | ABS | raye | Absence |
-| Formation Azure | DOC | uni | — |
-| Veille Technologique | DOC | uni | **Aucun pointage** — teste l'UI d'un projet vide |
+| Project | Code | Pattern | Notes |
+|---------|------|---------|-------|
+| Client Portal | DEV | solid | — |
+| Billing API | BUG | dotted | — |
+| Mobile App | DEV | dotted | — |
+| UI Redesign | DOC | solid | — |
+| CI/CD Infra | RUN | solid | — |
+| Team Rituals | MEET | dotted | — |
+| Public Holiday | ABS | striped | Absence |
+| RTT | ABS | striped | Absence |
+| Sick Leave | ABS | striped | Absence |
+| Azure Training | DOC | solid | — |
+| Tech Watch | DOC | solid | **No time entries** — tests the UI for an empty project |
 
-Les trois motifs (`uni`, `raye`, `pointille`) sont couverts.
+All three visual patterns (`solid`, `dotted`, `striped`) are covered.
 
-### Utilisateurs (5)
+### Users (5)
 
-| Nom | Couleur | OIDC `sub` |
-|-----|---------|------------|
+| Name | Color | OIDC `sub` |
+|------|-------|------------|
 | Alice Martin | `#3b82f6` | — |
 | Yassine Benali | `#14b8a6` | — |
 | Sophie Leroy | `#a855f7` | — |
 | Thomas Bernard | `#f59e0b` | — |
-| Camille Dupont | `#ef4444` | `oidc-sub-camille-001` (teste la contrainte d'unicité OIDC) |
+| Camille Dupont | `#ef4444` | `oidc-sub-camille-001` (tests OIDC uniqueness constraint) |
 
-### Pointages (≈ 84)
+### Time Entries (≈ 84)
 
-Les pointages couvrent **5 semaines** (semaine−3 à semaine+1 par rapport à la date courante) et illustrent tous les cas limites :
+Time entries cover **5 weeks** (week−3 to week+1 relative to the current date) and illustrate all edge cases:
 
-| Cas de test | Description |
-|-------------|-------------|
-| Full-day | `matin → soir` sur un seul jour |
-| Demi-journée matin | `matin → midi` |
-| Demi-journée après-midi | `midi → soir` |
-| Bloc multi-jours | ex. mardi → jeudi (test Gantt / fusion) |
-| Inter-jours | `lundi midi → mardi soir` (chevauchement de demi-journée entre deux jours) |
-| RTT | Alice mer sem−1, Camille mer sem−1, Alice lun sem+1 |
-| Jour Férié | Thomas lun sem−1 (note : "Lundi de Pâques") |
-| Arrêt Maladie | Yassine jeu-ven sem−1 (multi-jours + note médicale) |
-| Notes | 6 entrées annotées (bug critique, formations, absences) |
-| Semaine courante partielle | Seuls les jours jusqu'à aujourd'hui sont remplis |
-| Planification future | RTT Alice + semaine formation complète Thomas (sem+1) |
+| Test case | Description |
+|-----------|-------------|
+| Full-day | `morning → evening` on a single day |
+| Morning half-day | `morning → midday` |
+| Afternoon half-day | `midday → evening` |
+| Multi-day block | e.g. Tuesday → Thursday (Gantt / merge test) |
+| Cross-day | `Monday midday → Tuesday evening` (half-day overlap across two days) |
+| RTT | Alice Wed week−1, Camille Wed week−1, Alice Mon week+1 |
+| Public holiday | Thomas Mon week−1 (note: "Easter Monday") |
+| Sick leave | Yassine Thu-Fri week−1 (multi-day + medical note) |
+| Notes | 6 annotated entries (critical bug, training, absences) |
+| Partial current week | Only days up to today are filled |
+| Future planning | Alice RTT + Thomas full training week (week+1) |
 
-## Développement local sans Docker
+## Local Development without Docker
 
 ### Backend (Flask)
 
@@ -224,22 +236,22 @@ npm install
 npm start
 ```
 
-## Type checking Python (ty)
+## Python Type Checking (ty)
 
 ```bash
-# Depuis la racine du projet
+# From the project root
 pip install ty
 
-# Vérifier le backend
+# Check the backend
 ty check backend/app
 ```
 
-Configuration centralisée dans `pyproject.toml` via `[tool.ty]`.
+Centralized configuration in `pyproject.toml` under `[tool.ty]`.
 
-## Notes techniques
+## Technical Notes
 
-- **Semaines ISO 8601**: Les numéros de semaine suivent la norme ISO (semaine commence le lundi)
-- **Précision des jours**: Stocké en DECIMAL(5,2) pour supporter les demi-journées
-- **Couleurs**: Format hexadécimal strict #RRGGBB validé côté serveur
-- **CORS**: Configuré pour accepter les requêtes depuis le frontend React
-- **Schéma DB**: Création automatique des tables au démarrage via SQLAlchemy (`db.create_all()`)
+- **ISO 8601 weeks**: Week numbers follow the ISO standard (week starts on Monday)
+- **Day precision**: Stored as DECIMAL(5,2) to support half-days
+- **Colors**: Strict #RRGGBB hexadecimal format validated server-side
+- **CORS**: Configured to accept requests from the React frontend
+- **DB schema**: Tables are created automatically at startup via SQLAlchemy (`db.create_all()`)

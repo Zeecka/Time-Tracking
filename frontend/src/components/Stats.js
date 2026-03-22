@@ -7,7 +7,8 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
   LabelList,
 } from 'recharts';
-import { statsAPI, utilisateurAPI } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import { statsAPI, userAPI } from '../services/api';
 
 // ── ISO Week helpers ──────────────────────────────────────────────────────────
 const getCurrentIsoWeekInfo = () => {
@@ -34,17 +35,12 @@ const CURRENT_YEAR = CURRENT.year;
 const CURRENT_MONTH = new Date().getMonth() + 1;
 const CURRENT_WEEK = CURRENT.week;
 
-const MOIS_LABELS = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
-
 // ── Theme helper ──────────────────────────────────────────────────────────────
 const isDarkMode = () =>
   document.documentElement.getAttribute('data-bs-theme') === 'dark';
 
 // ── Tooltip personnalisé ──────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label, unit = 'demi-j.' }) => {
+const CustomTooltip = ({ active, payload, label, unit = '' }) => {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
@@ -77,21 +73,22 @@ const KpiCard = ({ title, value, subtitle, color, icon }) => (
   </Card>
 );
 
-// ── Couleur par index pour les codes pointage ─────────────────────────────────
-const getCodePointageColor = (index) => `hsl(${(index * 47 + 30) % 360}, 65%, 55%)`;
+// ── Color helper for tracking codes ─────────────────────────────────────────
+const getTrackingCodeColor = (index) => `hsl(${(index * 47 + 30) % 360}, 65%, 55%)`;
 
 // ── Composant principal ───────────────────────────────────────────────────────
 export default function Stats() {
+  const { t } = useTranslation();
   // Filters
-  const [granularite, setGranularite] = useState('mois');
-  const [annee, setAnnee] = useState(CURRENT_YEAR);
-  const [mois, setMois] = useState(CURRENT_MONTH);
-  const [semaine, setSemaine] = useState(CURRENT_WEEK);
-  const [utilisateurId, setUtilisateurId] = useState('');
+  const [granularity, setGranularity] = useState('month');
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [month, setMonth] = useState(CURRENT_MONTH);
+  const [week, setWeek] = useState(CURRENT_WEEK);
+  const [userId, setUserId] = useState('');
 
   // Data
   const [stats, setStats] = useState(null);
-  const [utilisateurs, setUtilisateurs] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dark, setDark] = useState(isDarkMode());
@@ -105,27 +102,43 @@ export default function Stats() {
 
   // Load users for select
   useEffect(() => {
-    utilisateurAPI.getAll()
-      .then(r => setUtilisateurs(r.data))
+    userAPI.getAll()
+      .then(r => setUsers(r.data))
       .catch(() => {});
   }, []);
 
   const fetchStats = useCallback(() => {
     setLoading(true);
     setError(null);
-    const params = { granularite, annee };
-    if (granularite === 'mois') params.mois = mois;
-    if (granularite === 'semaine') params.numero_semaine = semaine;
-    if (utilisateurId) params.utilisateur_id = utilisateurId;
+    const params = { granularity, year };
+    if (granularity === 'month') params.month = month;
+    if (granularity === 'week') params.week_number = week;
+    if (userId) params.user_id = userId;
 
     statsAPI.get(params)
       .then(r => setStats(r.data))
-      .catch(e => setError(e.response?.data?.error || 'Erreur lors du chargement des statistiques.'))
+      .catch(e => setError(e.response?.data?.error || t('stats.errorLoad')))
       .finally(() => setLoading(false));
-  }, [granularite, annee, mois, semaine, utilisateurId]);
+  }, [granularity, year, month, week, userId, t]);
 
   // Auto-fetch on mount and when filters change
   useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // ── Month labels (translated)
+  const monthLabels = useMemo(() => [
+    t('months.january'),
+    t('months.february'),
+    t('months.march'),
+    t('months.april'),
+    t('months.may'),
+    t('months.june'),
+    t('months.july'),
+    t('months.august'),
+    t('months.september'),
+    t('months.october'),
+    t('months.november'),
+    t('months.december'),
+  ], [t]);
 
   // ── Year options
   const yearOptions = useMemo(() => {
@@ -134,7 +147,7 @@ export default function Stats() {
     return years;
   }, []);
 
-  const maxWeeks = useMemo(() => getIsoWeeksInYear(annee), [annee]);
+  const maxWeeks = useMemo(() => getIsoWeeksInYear(year), [year]);
 
   // ── Chart colors
   const chartColors = {
@@ -146,43 +159,47 @@ export default function Stats() {
   };
 
   // ── Derived values
-  const globalTaux = useMemo(() => {
-    if (!stats || !stats.utilisateurs.length || stats.demi_journees_possibles === 0) return null;
-    const total = stats.utilisateurs.reduce((s, u) => s + u.demi_journees_travaillees, 0);
-    const possible = stats.utilisateurs.length * stats.demi_journees_possibles;
+  const globalRate = useMemo(() => {
+    if (!stats || !stats.users.length || stats.possible_half_days === 0) return null;
+    const total = stats.users.reduce((s, u) => s + u.worked_half_days, 0);
+    const possible = stats.users.length * stats.possible_half_days;
     return Math.round((total / possible) * 100);
   }, [stats]);
 
   const activeUsers = useMemo(() => {
     if (!stats) return 0;
-    return stats.utilisateurs.filter(u => u.demi_journees_travaillees > 0).length;
+    return stats.users.filter(u => u.worked_half_days > 0).length;
   }, [stats]);
 
   // ── Data for user bar chart (horizontal)
   const userBarData = useMemo(() => {
     if (!stats) return [];
-    return stats.utilisateurs.map(u => ({
-      nom: u.nom,
-      Présent: u.demi_journees_travaillees,
-      Absent: u.demi_journees_absentes,
-      couleur: u.couleur,
+    return stats.users.map(u => ({
+      name: u.name,
+      present: u.worked_half_days,
+      absent: u.absent_half_days,
+      color: u.color,
     }));
   }, [stats]);
 
   // ── Data for pie chart (projects)
   const pieData = useMemo(() => {
     if (!stats) return [];
-    return stats.projets.map(p => ({ name: p.nom, value: p.demi_journees, couleur: p.couleur }));
+    return stats.projects.map((p, index) => ({
+      name: p.name,
+      value: p.half_days,
+      color: p.color || getTrackingCodeColor(index),
+    }));
   }, [stats]);
 
   // ── Period label
   const periodLabel = useMemo(() => {
     if (!stats) return '';
-    const { granularite: g, annee: a, mois: m, numero_semaine: s } = stats.periode;
-    if (g === 'semaine') return `Semaine ${s} / ${a}`;
-    if (g === 'mois') return `${MOIS_LABELS[(m || 1) - 1]} ${a}`;
-    return `Année ${a}`;
-  }, [stats]);
+    const { granularity: g, year: a, month: m, week_number: s } = stats.period;
+    if (g === 'week') return `${t('stats.week')} ${s} / ${a}`;
+    if (g === 'month') return `${monthLabels[(m || 1) - 1]} ${a}`;
+    return `${t('common.year')} ${a}`;
+  }, [stats, t, monthLabels]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -192,13 +209,13 @@ export default function Stats() {
         <div>
           <h2 className="mb-0" style={{ fontWeight: 700 }}>
             <i className="fas fa-chart-bar me-2" style={{ color: '#3498db' }}></i>
-            Statistiques
+            {t('stats.title')}
           </h2>
           {stats && <small className="text-muted">{periodLabel}</small>}
         </div>
         <Button variant="outline-primary" size="sm" onClick={fetchStats} disabled={loading}>
           <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''} me-1`}></i>
-          Actualiser
+          {t('common.refresh') || 'Refresh'}
         </Button>
       </div>
 
@@ -208,18 +225,18 @@ export default function Stats() {
           <Row className="g-3 align-items-end">
             {/* Granularité */}
             <Col xs={12} sm={6} md={3}>
-              <Form.Label className="fw-semibold mb-1">Période</Form.Label>
+              <Form.Label className="fw-semibold mb-1">{t('stats.granularity')}</Form.Label>
               <div className="d-flex gap-1">
-                {['semaine', 'mois', 'annee'].map(g => (
+                {['week', 'month', 'year'].map(g => (
                   <Button
                     key={g}
                     size="sm"
-                    variant={granularite === g ? 'primary' : 'outline-secondary'}
-                    onClick={() => setGranularite(g)}
+                    variant={granularity === g ? 'primary' : 'outline-secondary'}
+                    onClick={() => setGranularity(g)}
                     className="flex-fill"
                     style={{ textTransform: 'capitalize' }}
                   >
-                    {g === 'semaine' ? 'Semaine' : g === 'mois' ? 'Mois' : 'Année'}
+                    {t(`stats.granularities.${g}`)}
                   </Button>
                 ))}
               </div>
@@ -227,18 +244,18 @@ export default function Stats() {
 
             {/* Année */}
             <Col xs={6} sm={4} md={2}>
-              <Form.Label className="fw-semibold mb-1">Année</Form.Label>
-              <Form.Select size="sm" value={annee} onChange={e => setAnnee(Number(e.target.value))}>
+              <Form.Label className="fw-semibold mb-1">{t('stats.year')}</Form.Label>
+              <Form.Select size="sm" value={year} onChange={e => setYear(Number(e.target.value))}>
                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
               </Form.Select>
             </Col>
 
             {/* Mois (if granularite = mois) */}
-            {granularite === 'mois' && (
+{granularity === 'month' && (
               <Col xs={6} sm={4} md={3}>
-                <Form.Label className="fw-semibold mb-1">Mois</Form.Label>
-                <Form.Select size="sm" value={mois} onChange={e => setMois(Number(e.target.value))}>
-                  {MOIS_LABELS.map((name, i) => (
+                <Form.Label className="fw-semibold mb-1">{t('stats.month')}</Form.Label>
+                <Form.Select size="sm" value={month} onChange={e => setMonth(Number(e.target.value))}>
+                  {monthLabels.map((name, i) => (
                     <option key={i + 1} value={i + 1}>{name}</option>
                   ))}
                 </Form.Select>
@@ -246,12 +263,12 @@ export default function Stats() {
             )}
 
             {/* Semaine (if granularite = semaine) */}
-            {granularite === 'semaine' && (
+{granularity === 'week' && (
               <Col xs={6} sm={4} md={2}>
-                <Form.Label className="fw-semibold mb-1">Semaine</Form.Label>
-                <Form.Select size="sm" value={semaine} onChange={e => setSemaine(Number(e.target.value))}>
+                <Form.Label className="fw-semibold mb-1">{t('stats.week')}</Form.Label>
+                <Form.Select size="sm" value={week} onChange={e => setWeek(Number(e.target.value))}>
                   {Array.from({ length: maxWeeks }, (_, i) => i + 1).map(w => (
-                    <option key={w} value={w}>S{w}</option>
+                    <option key={w} value={w}>W{w}</option>
                   ))}
                 </Form.Select>
               </Col>
@@ -259,11 +276,11 @@ export default function Stats() {
 
             {/* Utilisateur */}
             <Col xs={12} sm={6} md={3}>
-              <Form.Label className="fw-semibold mb-1">Utilisateur</Form.Label>
-              <Form.Select size="sm" value={utilisateurId} onChange={e => setUtilisateurId(e.target.value)}>
-                <option value="">Tous les utilisateurs</option>
-                {utilisateurs.map(u => (
-                  <option key={u.id} value={u.id}>{u.nom}</option>
+              <Form.Label className="fw-semibold mb-1">{t('stats.user')}</Form.Label>
+              <Form.Select size="sm" value={userId} onChange={e => setUserId(e.target.value)}>
+                <option value="">{t('stats.allUsers')}</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </Form.Select>
             </Col>
@@ -278,7 +295,7 @@ export default function Stats() {
       {loading && (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
-          <p className="mt-2 text-muted">Chargement des statistiques…</p>
+          <p className="mt-2 text-muted">{t('common.loading')}</p>
         </div>
       )}
 
@@ -289,39 +306,39 @@ export default function Stats() {
           <Row className="g-3 mb-4">
             <Col xs={6} lg={3}>
               <KpiCard
-                title="Jours ouvrables"
-                value={stats.jours_ouvrables}
-                subtitle={`${stats.demi_journees_possibles} demi-journées`}
+                title={t('stats.workingDays')}
+                value={stats.working_days}
+                subtitle={`${stats.possible_half_days} ${t('stats.halfDays')}`}
                 color="#3498db"
                 icon="📅"
               />
             </Col>
             <Col xs={6} lg={3}>
               <KpiCard
-                title="Taux de présence global"
-                value={globalTaux !== null ? `${globalTaux}%` : '—'}
-                subtitle={utilisateurId ? 'pour cet utilisateur' : 'moyenne tous utilisateurs'}
-                color={globalTaux >= 80 ? '#2ecc71' : globalTaux >= 50 ? '#f39c12' : '#e74c3c'}
+                title={t('stats.presenceRate')}
+                value={globalRate !== null ? `${globalRate}%` : '—'}
+                subtitle={userId ? t('stats.forThisUser') || 'for this user' : t('stats.averageAllUsers') || 'average all users'}
+                color={globalRate >= 80 ? '#2ecc71' : globalRate >= 50 ? '#f39c12' : '#e74c3c'}
                 icon="✅"
               />
             </Col>
             <Col xs={6} lg={3}>
               <KpiCard
-                title="Utilisateurs actifs"
+                title={t('stats.activeUsers') || 'Active users'}
                 value={activeUsers}
-                subtitle={`sur ${stats.utilisateurs.length} utilisateur(s)`}
+                subtitle={`${t('stats.outOf') || 'out of'} ${stats.users.length} ${t('stats.usersCount') || 'user(s)'}`}
                 color="#9b59b6"
                 icon="👥"
               />
             </Col>
             <Col xs={6} lg={3}>
               <KpiCard
-                title="Projets pointés"
-                value={stats.projets.length}
+                title={t('stats.pointedProjects') || 'Tracked projects'}
+                value={stats.projects.length}
                 subtitle={
-                  stats.projets.length > 0
-                    ? `Top : ${stats.projets[0].nom}`
-                    : 'Aucun pointage'
+                  stats.projects.length > 0
+                    ? `Top: ${stats.projects[0].name}`
+                    : t('common.noData')
                 }
                 color="#e67e22"
                 icon="🗂️"
@@ -336,11 +353,11 @@ export default function Stats() {
               <Card className="h-100">
                 <Card.Header className="fw-semibold">
                   <i className="fas fa-users me-2 text-primary"></i>
-                  Présence / Absence par utilisateur
+                  {t('stats.presenceAbsenceByUser') || 'Presence / Absence by user'}
                 </Card.Header>
                 <Card.Body>
                   {userBarData.length === 0 ? (
-                    <p className="text-muted text-center py-4">Aucune donnée</p>
+                    <p className="text-muted text-center py-4">{t('common.noData')}</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={Math.max(200, userBarData.length * 48)}>
                       <BarChart
@@ -354,23 +371,23 @@ export default function Stats() {
                           tick={{ fill: chartColors.text, fontSize: 11 }}
                           axisLine={{ stroke: chartColors.axisLine }}
                           tickLine={false}
-                          label={{ value: 'demi-journées', position: 'insideBottomRight', offset: -10, fill: chartColors.text, fontSize: 11 }}
+                          label={{ value: t('stats.halfDays'), position: 'insideBottomRight', offset: -10, fill: chartColors.text, fontSize: 11 }}
                         />
                         <YAxis
                           type="category"
-                          dataKey="nom"
+                          dataKey="name"
                           width={100}
                           tick={{ fill: chartColors.text, fontSize: 12 }}
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="Présent" stackId="a" fill={chartColors.presence} radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="Présent" position="insideRight" style={{ fill: '#fff', fontSize: 11, fontWeight: 600 }} formatter={v => v > 0 ? v : ''} />
+                        <Bar dataKey="present" stackId="a" fill={chartColors.presence} radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="present" position="insideRight" style={{ fill: '#fff', fontSize: 11, fontWeight: 600 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
-                        <Bar dataKey="Absent" stackId="a" fill={chartColors.absence} radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="Absent" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
+                        <Bar dataKey="absent" stackId="a" fill={chartColors.absence} radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="absent" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -384,11 +401,11 @@ export default function Stats() {
               <Card className="h-100">
                 <Card.Header className="fw-semibold">
                   <i className="fas fa-project-diagram me-2 text-warning"></i>
-                  Distribution par projet
+                  {t('stats.distributionByProject') || 'Distribution by project'}
                 </Card.Header>
                 <Card.Body className="d-flex flex-column align-items-center justify-content-center">
                   {pieData.length === 0 ? (
-                    <p className="text-muted text-center py-4">Aucun pointage sur cette période</p>
+                    <p className="text-muted text-center py-4">{t('common.noData')}</p>
                   ) : (
                     <>
                       <ResponsiveContainer width="100%" height={220}>
@@ -404,12 +421,12 @@ export default function Stats() {
                             paddingAngle={2}
                           >
                             {pieData.map((entry, index) => (
-                              <Cell key={index} fill={entry.couleur} />
+                              <Cell key={index} fill={entry.color} />
                             ))}
                           </Pie>
                           <Tooltip
-                            content={<CustomTooltip unit="demi-j." />}
-                            formatter={(value, name) => [`${value} demi-j.`, name]}
+                            content={<CustomTooltip unit={t('common.halfDayAbbr')} />}
+                            formatter={(value, name) => [`${value} ${t('common.halfDayAbbr')}`, name]}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -417,7 +434,7 @@ export default function Stats() {
                       <div className="d-flex flex-wrap justify-content-center gap-2 mt-1">
                         {pieData.map((p, i) => (
                           <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: 12 }}>
-                            <span style={{ width: 10, height: 10, borderRadius: '50%', background: p.couleur, display: 'inline-block', flexShrink: 0 }}></span>
+                            <span style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, display: 'inline-block', flexShrink: 0 }}></span>
                             <span>{p.name}</span>
                             <Badge bg="secondary" style={{ fontSize: 10 }}>{p.value}</Badge>
                           </div>
@@ -431,15 +448,15 @@ export default function Stats() {
           </Row>
 
           {/* Trend chart (not for semaine) */}
-          {granularite !== 'semaine' && stats.tendance && stats.tendance.length > 0 && (
+          {granularity !== 'week' && stats.trend && stats.trend.length > 0 && (
             <Card className="mb-4">
               <Card.Header className="fw-semibold">
                 <i className="fas fa-chart-line me-2 text-success"></i>
-                {granularite === 'annee' ? 'Évolution mensuelle' : 'Évolution hebdomadaire'}
+                {granularity === 'year' ? (t('stats.monthlyEvolution') || 'Monthly evolution') : (t('stats.weeklyEvolution') || 'Weekly evolution')}
               </Card.Header>
               <Card.Body>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={stats.tendance} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                  <BarChart data={stats.trend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis
                       dataKey="label"
@@ -452,12 +469,12 @@ export default function Stats() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<CustomTooltip unit="demi-j." />} />
+                    <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="demi_journees" name="Pointées" fill="#3498db" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="demi_journees" position="top" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
+                    <Bar dataKey="half_days" name={t('stats.workedHalfDays')} fill="#3498db" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="half_days" position="top" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
                     </Bar>
-                    <Bar dataKey="demi_journees_possibles" name="Possibles" fill={dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="possible_half_days" name={t('stats.possibleHalfDays')} fill={dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </Card.Body>
@@ -465,18 +482,18 @@ export default function Stats() {
           )}
 
           {/* Taux de présence par utilisateur (gauge-like bar) */}
-          {stats.utilisateurs.length > 0 && (
+          {stats.users.length > 0 && (
             <Card className="mb-4">
               <Card.Header className="fw-semibold">
                 <i className="fas fa-percentage me-2 text-info"></i>
-                Taux de présence par utilisateur
+                {t('stats.presenceRateByUser') || 'Presence rate by user'}
               </Card.Header>
               <Card.Body>
-                <ResponsiveContainer width="100%" height={Math.max(180, stats.utilisateurs.length * 44)}>
+                <ResponsiveContainer width="100%" height={Math.max(180, stats.users.length * 44)}>
                   <BarChart
-                    data={stats.utilisateurs.map(u => ({
-                      nom: u.nom,
-                      'Taux présence (%)': Math.round(u.taux_presence * 100),
+                    data={stats.users.map(u => ({
+                      name: u.name,
+                      'Presence rate (%)': Math.round(u.presence_rate * 100),
                     }))}
                     layout="vertical"
                     margin={{ top: 5, right: 60, left: 10, bottom: 5 }}
@@ -492,7 +509,7 @@ export default function Stats() {
                     />
                     <YAxis
                       type="category"
-                      dataKey="nom"
+                      dataKey="name"
                       width={100}
                       tick={{ fill: chartColors.text, fontSize: 12 }}
                       axisLine={false}
@@ -501,21 +518,21 @@ export default function Stats() {
                     <Tooltip
                       content={<CustomTooltip unit="%" />}
                     />
-                    <Bar dataKey="Taux présence (%)" radius={[0, 6, 6, 0]}>
-                      {stats.utilisateurs.map((u, i) => (
+                    <Bar dataKey="Presence rate (%)" radius={[0, 6, 6, 0]}>
+                      {stats.users.map((u, i) => (
                         <Cell
                           key={i}
                           fill={
-                            u.taux_presence >= 0.8
+                            u.presence_rate >= 0.8
                               ? '#2ecc71'
-                              : u.taux_presence >= 0.5
+                              : u.presence_rate >= 0.5
                               ? '#f39c12'
                               : '#e74c3c'
                           }
                         />
                       ))}
                       <LabelList
-                        dataKey="Taux présence (%)"
+                        dataKey="Presence rate (%)"
                         position="right"
                         style={{ fill: chartColors.text, fontSize: 12, fontWeight: 600 }}
                         formatter={v => `${v}%`}
@@ -525,9 +542,9 @@ export default function Stats() {
                 </ResponsiveContainer>
                 {/* Color legend */}
                 <div className="d-flex gap-3 justify-content-center mt-2 flex-wrap" style={{ fontSize: 12 }}>
-                  <span><span style={{ background: '#2ecc71', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>≥ 80% — Bonne présence</span>
-                  <span><span style={{ background: '#f39c12', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>50–79% — Moyenne</span>
-                  <span><span style={{ background: '#e74c3c', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>&lt; 50% — Faible présence</span>
+                  <span><span style={{ background: '#2ecc71', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>≥ 80% — {t('stats.presenceLevelGood')}</span>
+                  <span><span style={{ background: '#f39c12', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>50–79% — {t('stats.presenceLevelAverage')}</span>
+                  <span><span style={{ background: '#e74c3c', padding: '2px 10px', borderRadius: 4, marginRight: 4 }}></span>&lt; 50% — {t('stats.presenceLevelLow')}</span>
                 </div>
               </Card.Body>
             </Card>
@@ -537,81 +554,81 @@ export default function Stats() {
           <Card className="mb-4">
             <Card.Header className="fw-semibold">
               <i className="fas fa-table me-2 text-secondary"></i>
-              Détail par utilisateur
+                {t('stats.userDetails')}
             </Card.Header>
             <Card.Body className="p-0">
               <div className="table-responsive">
                 <Table striped hover className="mb-0" style={{ fontSize: 13 }}>
                   <thead>
                     <tr>
-                      <th>Utilisateur</th>
-                      <th className="text-center">Demi-j. pointées</th>
-                      <th className="text-center">Demi-j. absentes</th>
-                      <th className="text-center">Taux présence</th>
-                      <th className="text-center">Taux absence</th>
-                      <th>Projets principaux</th>
+                      <th>{t('stats.user')}</th>
+                      <th className="text-center">{t('stats.workedHalfDays')}</th>
+                      <th className="text-center">{t('stats.absentHalfDays')}</th>
+                      <th className="text-center">{t('stats.presenceRate')}</th>
+                      <th className="text-center">{t('stats.absenceRate')}</th>
+                      <th>{t('stats.topProjects')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.utilisateurs.length === 0 ? (
+                    {stats.users.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center text-muted py-4">
-                          Aucune donnée pour cette période
+                          {t('common.noData')}
                         </td>
                       </tr>
                     ) : (
-                      stats.utilisateurs.map(u => (
+                      stats.users.map(u => (
                         <tr key={u.id}>
                           <td>
                             <div className="d-flex align-items-center gap-2">
                               <span style={{
                                 width: 10, height: 10, borderRadius: '50%',
-                                background: u.couleur, display: 'inline-block', flexShrink: 0,
+                                background: u.color, display: 'inline-block', flexShrink: 0,
                               }}></span>
-                              <span className="fw-semibold">{u.nom}</span>
+                              <span className="fw-semibold">{u.name}</span>
                             </div>
                           </td>
                           <td className="text-center">
-                            <strong>{u.demi_journees_travaillees}</strong>
-                            <span className="text-muted"> /{stats.demi_journees_possibles}</span>
+                            <strong>{u.worked_half_days}</strong>
+                            <span className="text-muted"> /{stats.possible_half_days}</span>
                           </td>
                           <td className="text-center">
-                            <span style={{ color: u.demi_journees_absentes > 0 ? '#e74c3c' : '#2ecc71' }}>
-                              {u.demi_journees_absentes}
+                            <span style={{ color: u.absent_half_days > 0 ? '#e74c3c' : '#2ecc71' }}>
+                              {u.absent_half_days}
                             </span>
                           </td>
                           <td className="text-center">
                             <span style={{
-                              color: u.taux_presence >= 0.8 ? '#2ecc71' : u.taux_presence >= 0.5 ? '#f39c12' : '#e74c3c',
+                              color: u.presence_rate >= 0.8 ? '#2ecc71' : u.presence_rate >= 0.5 ? '#f39c12' : '#e74c3c',
                               fontWeight: 700,
                             }}>
-                              {Math.round(u.taux_presence * 100)}%
+                              {Math.round(u.presence_rate * 100)}%
                             </span>
                             <div style={{ height: 4, background: 'var(--bs-border-color)', borderRadius: 2, marginTop: 3, maxWidth: 80, margin: '3px auto 0' }}>
                               <div style={{
                                 height: '100%',
-                                width: `${Math.min(100, Math.round(u.taux_presence * 100))}%`,
-                                background: u.taux_presence >= 0.8 ? '#2ecc71' : u.taux_presence >= 0.5 ? '#f39c12' : '#e74c3c',
+                                width: `${Math.min(100, Math.round(u.presence_rate * 100))}%`,
+                                background: u.presence_rate >= 0.8 ? '#2ecc71' : u.presence_rate >= 0.5 ? '#f39c12' : '#e74c3c',
                                 borderRadius: 2,
                               }}></div>
                             </div>
                           </td>
                           <td className="text-center" style={{ color: '#e74c3c' }}>
-                            {Math.round(u.taux_absence * 100)}%
+                            {Math.round(u.absence_rate * 100)}%
                           </td>
                           <td>
                             <div className="d-flex flex-wrap gap-1">
-                              {u.par_projet.slice(0, 4).map(p => (
+                              {u.by_project.slice(0, 4).map(p => (
                                 <Badge
-                                  key={p.projet_id}
-                                  style={{ background: p.couleur, fontSize: 10 }}
+                                  key={p.project_id}
+                                  style={{ background: p.color, fontSize: 10 }}
                                 >
-                                  {p.nom} ({p.demi_journees})
+                                  {p.name} ({p.half_days})
                                 </Badge>
                               ))}
-                              {u.par_projet.length > 4 && (
+                              {u.by_project.length > 4 && (
                                 <Badge bg="secondary" style={{ fontSize: 10 }}>
-                                  +{u.par_projet.length - 4}
+                                  +{u.by_project.length - 4}
                                 </Badge>
                               )}
                             </div>
@@ -620,21 +637,21 @@ export default function Stats() {
                       ))
                     )}
                   </tbody>
-                  {stats.utilisateurs.length > 0 && (
+                  {stats.users.length > 0 && (
                     <tfoot>
                       <tr className="fw-semibold">
                         <td>Total</td>
                         <td className="text-center">
-                          {stats.utilisateurs.reduce((s, u) => s + u.demi_journees_travaillees, 0)}
+                          {stats.users.reduce((s, u) => s + u.worked_half_days, 0)}
                         </td>
                         <td className="text-center">
-                          {stats.utilisateurs.reduce((s, u) => s + u.demi_journees_absentes, 0)}
+                          {stats.users.reduce((s, u) => s + u.absent_half_days, 0)}
                         </td>
                         <td className="text-center">
-                          {globalTaux !== null ? `${globalTaux}%` : '—'}
+                          {globalRate !== null ? `${globalRate}%` : '—'}
                         </td>
                         <td className="text-center">
-                          {globalTaux !== null ? `${100 - globalTaux}%` : '—'}
+                          {globalRate !== null ? `${100 - globalRate}%` : '—'}
                         </td>
                         <td></td>
                       </tr>
@@ -646,18 +663,18 @@ export default function Stats() {
           </Card>
 
           {/* Per-user project breakdown */}
-          {stats.utilisateurs.filter(u => u.par_projet.length > 0).length > 0 && (
+          {stats.users.filter(u => u.by_project.length > 0).length > 0 && (
             <Card className="mb-4">
               <Card.Header className="fw-semibold">
                 <i className="fas fa-layer-group me-2" style={{ color: '#9b59b6' }}></i>
-                Répartition par projet (par utilisateur)
+                {t('stats.distributionByProjectByUser')}
               </Card.Header>
               <Card.Body>
-                <ResponsiveContainer width="100%" height={Math.max(180, stats.utilisateurs.length * 44 + 40)}>
+                <ResponsiveContainer width="100%" height={Math.max(180, stats.users.length * 44 + 40)}>
                   <BarChart
-                    data={stats.utilisateurs.filter(u => u.demi_journees_travaillees > 0).map(u => {
-                      const row = { nom: u.nom };
-                      u.par_projet.forEach(p => { row[p.nom] = p.demi_journees; });
+                    data={stats.users.filter(u => u.worked_half_days > 0).map(u => {
+                      const row = { name: u.name };
+                      u.by_project.forEach(p => { row[p.name] = p.half_days; });
                       return row;
                     })}
                     layout="vertical"
@@ -665,11 +682,11 @@ export default function Stats() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
                     <XAxis type="number" tick={{ fill: chartColors.text, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }} tickLine={false} />
-                    <YAxis type="category" dataKey="nom" width={100} tick={{ fill: chartColors.text, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: chartColors.text, fontSize: 12 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    {stats.projets.map(p => (
-                      <Bar key={p.projet_id} dataKey={p.nom} stackId="a" fill={p.couleur} />
+                    {stats.projects.map(p => (
+                      <Bar key={p.project_id} dataKey={p.name} stackId="a" fill={p.color} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -678,18 +695,18 @@ export default function Stats() {
           )}
 
           {/* Distribution par code pointage */}
-          {stats.codes_pointage && stats.codes_pointage.length > 0 && (
+          {stats.tracking_codes && stats.tracking_codes.length > 0 && (
             <Row className="g-3 mb-4">
               <Col xs={12} lg={7}>
                 <Card className="h-100">
                   <Card.Header className="fw-semibold">
                     <i className="fas fa-tags me-2" style={{ color: '#e67e22' }}></i>
-                    Temps passé par code pointage
+                    {t('stats.topCodes')}
                   </Card.Header>
                   <Card.Body>
-                    <ResponsiveContainer width="100%" height={Math.max(200, stats.codes_pointage.length * 48)}>
+                    <ResponsiveContainer width="100%" height={Math.max(200, stats.tracking_codes.length * 48)}>
                       <BarChart
-                        data={stats.codes_pointage}
+                        data={stats.tracking_codes}
                         layout="vertical"
                         margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
                       >
@@ -699,7 +716,7 @@ export default function Stats() {
                           tick={{ fill: chartColors.text, fontSize: 11 }}
                           axisLine={{ stroke: chartColors.axisLine }}
                           tickLine={false}
-                          label={{ value: 'demi-journées', position: 'insideBottomRight', offset: -10, fill: chartColors.text, fontSize: 11 }}
+                          label={{ value: t('stats.halfDays'), position: 'insideBottomRight', offset: -10, fill: chartColors.text, fontSize: 11 }}
                         />
                         <YAxis
                           type="category"
@@ -709,9 +726,9 @@ export default function Stats() {
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<CustomTooltip unit="demi-j." />} />
-                        <Bar dataKey="demi_journees" name="Demi-journées" fill="#e67e22" radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="demi_journees" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
+                        <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
+                        <Bar dataKey="half_days" name={t('stats.halfDays')} fill="#e67e22" radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="half_days" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -722,14 +739,14 @@ export default function Stats() {
                 <Card className="h-100">
                   <Card.Header className="fw-semibold">
                     <i className="fas fa-chart-pie me-2" style={{ color: '#e67e22' }}></i>
-                    Répartition par code pointage
+                    {t('stats.distributionByTrackingCode') || 'Distribution by tracking code'}
                   </Card.Header>
                   <Card.Body className="d-flex flex-column align-items-center justify-content-center">
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
                         <Pie
-                          data={stats.codes_pointage}
-                          dataKey="demi_journees"
+                          data={stats.tracking_codes}
+                          dataKey="half_days"
                           nameKey="code"
                           cx="50%"
                           cy="50%"
@@ -737,25 +754,25 @@ export default function Stats() {
                           innerRadius={40}
                           paddingAngle={2}
                         >
-                          {stats.codes_pointage.map((entry, index) => (
+                          {stats.tracking_codes.map((entry, index) => (
                             <Cell
                               key={index}
-                              fill={getCodePointageColor(index)}
+                              fill={getTrackingCodeColor(index)}
                             />
                           ))}
                         </Pie>
                         <Tooltip
-                          content={<CustomTooltip unit="demi-j." />}
-                          formatter={(value, name) => [`${value} demi-j.`, name]}
+                          content={<CustomTooltip unit={t('common.halfDayAbbr')} />}
+                          formatter={(value, name) => [`${value} ${t('common.halfDayAbbr')}`, name]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="d-flex flex-wrap justify-content-center gap-2 mt-1">
-                      {stats.codes_pointage.map((cp, i) => (
+                      {stats.tracking_codes.map((cp, i) => (
                         <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: 12 }}>
-                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: getCodePointageColor(i), display: 'inline-block', flexShrink: 0 }}></span>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: getTrackingCodeColor(i), display: 'inline-block', flexShrink: 0 }}></span>
                           <span>{cp.code}</span>
-                          <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.demi_journees}</Badge>
+                          <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.half_days}</Badge>
                         </div>
                       ))}
                     </div>
@@ -767,10 +784,10 @@ export default function Stats() {
         </>
       )}
 
-      {stats && !loading && stats.utilisateurs.length === 0 && stats.projets.length === 0 && (
+      {stats && !loading && stats.users.length === 0 && stats.projects.length === 0 && (
         <Alert variant="info" className="mt-3">
           <i className="fas fa-info-circle me-2"></i>
-          Aucun pointage trouvé pour cette période. Essayez de modifier les filtres.
+          {t('common.noDataPeriod') || 'No data found for this period. Try adjusting the filters.'}
         </Alert>
       )}
     </div>

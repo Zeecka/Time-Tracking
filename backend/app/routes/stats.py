@@ -3,31 +3,21 @@ from datetime import date, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
 
-from app.models import CodePointage, Pointage, Projet, Utilisateur
+from app.models import Project, TimeEntry, TrackingCode, User
 
 stats_bp = Blueprint("stats", __name__)
 
-MOIS_NOMS = [
-    "Jan",
-    "Fév",
-    "Mar",
-    "Avr",
-    "Mai",
-    "Juin",
-    "Juil",
-    "Août",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Déc",
+MONTH_NAMES = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ]
 
 
-def _get_iso_week_date_range(annee, semaine):
+def _get_iso_week_date_range(year, week):
     """Return (monday, friday) for the given ISO week."""
-    jan4 = date(annee, 1, 4)
+    jan4 = date(year, 1, 4)
     monday_week1 = jan4 - timedelta(days=jan4.isoweekday() - 1)
-    monday = monday_week1 + timedelta(weeks=semaine - 1)
+    monday = monday_week1 + timedelta(weeks=week - 1)
     friday = monday + timedelta(days=4)
     return monday, friday
 
@@ -43,21 +33,21 @@ def _count_working_days(start, end):
     return total
 
 
-def _count_half_days(date_debut, periode_debut, date_fin, periode_fin):
-    """Count working half-days covered by a pointage entry."""
+def _count_half_days(start_date, start_period, end_date, end_period):
+    """Count working half-days covered by a time entry."""
     total = 0
-    current = date_debut
-    while current <= date_fin:
+    current = start_date
+    while current <= end_date:
         if current.weekday() < 5:
-            if current == date_debut and current == date_fin:
+            if current == start_date and current == end_date:
                 # Single day
                 total += (
-                    2 if (periode_debut == "matin" and periode_fin == "soir") else 1
+                    2 if (start_period == "morning" and end_period == "evening") else 1
                 )
-            elif current == date_debut:
-                total += 2 if periode_debut == "matin" else 1
-            elif current == date_fin:
-                total += 2 if periode_fin == "soir" else 1
+            elif current == start_date:
+                total += 2 if start_period == "morning" else 1
+            elif current == end_date:
+                total += 2 if end_period == "evening" else 1
             else:
                 total += 2
         current += timedelta(days=1)
@@ -65,16 +55,16 @@ def _count_half_days(date_debut, periode_debut, date_fin, periode_fin):
 
 
 def _count_half_days_in_range(
-    date_debut, periode_debut, date_fin, periode_fin, range_start, range_end
+    start_date, start_period, end_date, end_period, range_start, range_end
 ):
-    """Count working half-days of a pointage that fall within [range_start, range_end]."""
-    actual_start = max(date_debut, range_start)
-    actual_end = min(date_fin, range_end)
+    """Count working half-days of a time entry that fall within [range_start, range_end]."""
+    actual_start = max(start_date, range_start)
+    actual_end = min(end_date, range_end)
     if actual_start > actual_end:
         return 0
-    eff_debut = "matin" if actual_start > date_debut else periode_debut
-    eff_fin = "soir" if actual_end < date_fin else periode_fin
-    return _count_half_days(actual_start, eff_debut, actual_end, eff_fin)
+    eff_start = "morning" if actual_start > start_date else start_period
+    eff_end = "evening" if actual_end < end_date else end_period
+    return _count_half_days(actual_start, eff_start, actual_end, eff_end)
 
 
 def _get_unique_weeks_in_range(start, end):
@@ -98,229 +88,225 @@ def get_stats():
     Compute attendance statistics for a given period.
 
     Query params:
-      granularite  : 'semaine' | 'mois' | 'annee'  (default: 'mois')
-      annee        : int  (default: current year)
-      mois         : int  (required when granularite='mois')
-      numero_semaine: int (required when granularite='semaine')
-      utilisateur_id: int (optional – restrict to one user)
+      granularity  : 'week' | 'month' | 'year'  (default: 'month')
+      year         : int  (default: current year)
+      month        : int  (required when granularity='month')
+      week_number  : int  (required when granularity='week')
+      user_id      : int  (optional – restrict to one user)
     """
-    granularite = request.args.get("granularite", "mois")
-    annee = request.args.get("annee", type=int) or date.today().year
-    mois = request.args.get("mois", type=int)
-    numero_semaine = request.args.get("numero_semaine", type=int)
-    utilisateur_id = request.args.get("utilisateur_id", type=int)
+    granularity = request.args.get("granularity", "month")
+    year = request.args.get("year", type=int) or date.today().year
+    month = request.args.get("month", type=int)
+    week_number = request.args.get("week_number", type=int)
+    user_id = request.args.get("user_id", type=int)
 
     # --- Build date range --------------------------------------------------
-    if granularite == "semaine":
-        if not numero_semaine:
+    if granularity == "week":
+        if not week_number:
             return jsonify(
-                {"error": "numero_semaine requis pour granularite=semaine"}
+                {"error": "week_number is required for granularity=week"}
             ), 400
-        range_start, range_end = _get_iso_week_date_range(annee, numero_semaine)
+        range_start, range_end = _get_iso_week_date_range(year, week_number)
 
-    elif granularite == "mois":
-        if not mois:
-            mois = date.today().month
-        last_day = calendar.monthrange(annee, mois)[1]
-        range_start = date(annee, mois, 1)
-        range_end = date(annee, mois, last_day)
+    elif granularity == "month":
+        if not month:
+            month = date.today().month
+        last_day = calendar.monthrange(year, month)[1]
+        range_start = date(year, month, 1)
+        range_end = date(year, month, last_day)
 
-    else:  # annee
-        granularite = "annee"
-        range_start = date(annee, 1, 1)
-        range_end = date(annee, 12, 31)
+    else:  # year
+        granularity = "year"
+        range_start = date(year, 1, 1)
+        range_end = date(year, 12, 31)
 
     # --- Working time reference -------------------------------------------
-    jours_ouvrables = _count_working_days(range_start, range_end)
-    demi_journees_possibles = jours_ouvrables * 2
+    working_days = _count_working_days(range_start, range_end)
+    possible_half_days = working_days * 2
 
-    # --- Fetch pointages in range -----------------------------------------
-    q = Pointage.query.filter(
-        Pointage.date_debut <= range_end,
-        Pointage.date_fin >= range_start,
+    # --- Fetch time entries in range --------------------------------------
+    q = TimeEntry.query.filter(
+        TimeEntry.start_date <= range_end,
+        TimeEntry.end_date >= range_start,
     )
-    if utilisateur_id:
-        q = q.filter_by(utilisateur_id=utilisateur_id)
-    pointages = q.all()
+    if user_id:
+        q = q.filter_by(user_id=user_id)
+    entries = q.all()
 
     # --- Users list -------------------------------------------------------
-    uq = Utilisateur.query
-    if utilisateur_id:
-        uq = uq.filter_by(id=utilisateur_id)
-    utilisateurs = uq.order_by(Utilisateur.nom).all()
+    uq = User.query
+    if user_id:
+        uq = uq.filter_by(id=user_id)
+    users = uq.order_by(User.name).all()
 
-    projets_map = {p.id: p for p in Projet.query.all()}
-    codes_map = {cp.id: cp for cp in CodePointage.query.all()}
+    projects_map = {p.id: p for p in Project.query.all()}
+    codes_map = {tc.id: tc for tc in TrackingCode.query.all()}
 
     # --- Compute per-user stats -------------------------------------------
     user_stats = {
         u.id: {
             "id": u.id,
-            "nom": u.nom,
-            "couleur": u.couleur,
-            "demi_journees_travaillees": 0,
-            "par_projet": {},
+            "name": u.name,
+            "color": u.color,
+            "worked_half_days": 0,
+            "by_project": {},
         }
-        for u in utilisateurs
+        for u in users
     }
-    projet_totals = {}
+    project_totals = {}
     code_totals = {}
 
-    for p in pointages:
+    for entry in entries:
         hd = _count_half_days_in_range(
-            p.date_debut,
-            p.periode_debut,
-            p.date_fin,
-            p.periode_fin,
+            entry.start_date,
+            entry.start_period,
+            entry.end_date,
+            entry.end_period,
             range_start,
             range_end,
         )
 
-        # Per-user accumulation
-        if p.utilisateur_id in user_stats:
-            user_stats[p.utilisateur_id]["demi_journees_travaillees"] += hd
-            by_proj = user_stats[p.utilisateur_id]["par_projet"]
-            if p.projet_id not in by_proj:
-                proj = projets_map.get(p.projet_id)
-                by_proj[p.projet_id] = {
-                    "projet_id": p.projet_id,
-                    "nom": proj.nom if proj else "?",
-                    "couleur": proj.couleur if proj else "#ccc",
-                    "demi_journees": 0,
+        if entry.user_id in user_stats:
+            user_stats[entry.user_id]["worked_half_days"] += hd
+            by_proj = user_stats[entry.user_id]["by_project"]
+            if entry.project_id not in by_proj:
+                proj = projects_map.get(entry.project_id)
+                by_proj[entry.project_id] = {
+                    "project_id": entry.project_id,
+                    "name": proj.name if proj else "?",
+                    "color": proj.color if proj else "#ccc",
+                    "half_days": 0,
                 }
-            by_proj[p.projet_id]["demi_journees"] += hd
+            by_proj[entry.project_id]["half_days"] += hd
 
-        # Global per-project accumulation
-        if p.projet_id not in projet_totals:
-            proj = projets_map.get(p.projet_id)
-            projet_totals[p.projet_id] = {
-                "projet_id": p.projet_id,
-                "nom": proj.nom if proj else "?",
-                "couleur": proj.couleur if proj else "#ccc",
-                "demi_journees": 0,
+        if entry.project_id not in project_totals:
+            proj = projects_map.get(entry.project_id)
+            project_totals[entry.project_id] = {
+                "project_id": entry.project_id,
+                "name": proj.name if proj else "?",
+                "color": proj.color if proj else "#ccc",
+                "half_days": 0,
             }
-        projet_totals[p.projet_id]["demi_journees"] += hd
+        project_totals[entry.project_id]["half_days"] += hd
 
-        # Global per-code-pointage accumulation
-        proj = projets_map.get(p.projet_id)
+        proj = projects_map.get(entry.project_id)
         if proj:
-            code_id = proj.code_pointage_id
+            code_id = proj.tracking_code_id
             if code_id not in code_totals:
-                cp = codes_map.get(code_id)
+                tc = codes_map.get(code_id)
                 code_totals[code_id] = {
                     "code_id": code_id,
-                    "code": cp.code if cp else "?",
-                    "demi_journees": 0,
+                    "code": tc.code if tc else "?",
+                    "half_days": 0,
                 }
-            code_totals[code_id]["demi_journees"] += hd
+            code_totals[code_id]["half_days"] += hd
 
     # Build final user list
     users_result = []
     for us in user_stats.values():
-        travailles = us["demi_journees_travaillees"]
-        taux = (
-            round(travailles / demi_journees_possibles, 4)
-            if demi_journees_possibles > 0
+        worked = us["worked_half_days"]
+        rate = (
+            round(worked / possible_half_days, 4)
+            if possible_half_days > 0
             else 0.0
         )
         users_result.append(
             {
                 "id": us["id"],
-                "nom": us["nom"],
-                "couleur": us["couleur"],
-                "demi_journees_travaillees": travailles,
-                "demi_journees_absentes": max(0, demi_journees_possibles - travailles),
-                "taux_presence": min(1.0, taux),
-                "taux_absence": max(0.0, round(1.0 - taux, 4)),
-                "par_projet": sorted(
-                    us["par_projet"].values(), key=lambda x: -x["demi_journees"]
+                "name": us["name"],
+                "color": us["color"],
+                "worked_half_days": worked,
+                "absent_half_days": max(0, possible_half_days - worked),
+                "presence_rate": min(1.0, rate),
+                "absence_rate": max(0.0, round(1.0 - rate, 4)),
+                "by_project": sorted(
+                    us["by_project"].values(), key=lambda x: -x["half_days"]
                 ),
             }
         )
 
     # --- Trend data -------------------------------------------------------
-    tendance = []
+    trend = []
 
-    if granularite == "annee":
+    if granularity == "year":
         for m in range(1, 13):
-            last_day = calendar.monthrange(annee, m)[1]
-            m_start = date(annee, m, 1)
-            m_end = date(annee, m, last_day)
+            last_day = calendar.monthrange(year, m)[1]
+            m_start = date(year, m, 1)
+            m_end = date(year, m, last_day)
             m_possible = _count_working_days(m_start, m_end) * 2
-            m_dj = sum(
+            m_hd = sum(
                 _count_half_days_in_range(
-                    p.date_debut,
-                    p.periode_debut,
-                    p.date_fin,
-                    p.periode_fin,
+                    e.start_date,
+                    e.start_period,
+                    e.end_date,
+                    e.end_period,
                     m_start,
                     m_end,
                 )
-                for p in pointages
+                for e in entries
             )
-            tendance.append(
+            trend.append(
                 {
-                    "label": MOIS_NOMS[m - 1],
-                    "mois": m,
-                    "annee": annee,
-                    "demi_journees": m_dj,
-                    "demi_journees_possibles": m_possible,
+                    "label": MONTH_NAMES[m - 1],
+                    "month": m,
+                    "year": year,
+                    "half_days": m_hd,
+                    "possible_half_days": m_possible,
                 }
             )
 
-    elif granularite == "mois":
-        for w_annee, w_num in _get_unique_weeks_in_range(range_start, range_end):
-            w_start, w_end = _get_iso_week_date_range(w_annee, w_num)
-            # Clip to month
+    elif granularity == "month":
+        for w_year, w_num in _get_unique_weeks_in_range(range_start, range_end):
+            w_start, w_end = _get_iso_week_date_range(w_year, w_num)
             w_start = max(w_start, range_start)
             w_end = min(w_end, range_end)
             w_possible = _count_working_days(w_start, w_end) * 2
-            w_dj = sum(
+            w_hd = sum(
                 _count_half_days_in_range(
-                    p.date_debut,
-                    p.periode_debut,
-                    p.date_fin,
-                    p.periode_fin,
+                    e.start_date,
+                    e.start_period,
+                    e.end_date,
+                    e.end_period,
                     w_start,
                     w_end,
                 )
-                for p in pointages
+                for e in entries
             )
-            tendance.append(
+            trend.append(
                 {
-                    "label": f"S{w_num}",
-                    "semaine": w_num,
-                    "annee": w_annee,
-                    "demi_journees": w_dj,
-                    "demi_journees_possibles": w_possible,
+                    "label": f"W{w_num}",
+                    "week": w_num,
+                    "year": w_year,
+                    "half_days": w_hd,
+                    "possible_half_days": w_possible,
                 }
             )
 
-    exclude_projets = current_app.config.get("STATS_EXCLUDE_PROJETS", [])
+    exclude_projects = current_app.config.get("STATS_EXCLUDE_PROJECTS", [])
 
     return jsonify(
         {
-            "periode": {
-                "granularite": granularite,
-                "annee": annee,
-                "mois": mois if granularite == "mois" else None,
-                "numero_semaine": numero_semaine if granularite == "semaine" else None,
+            "period": {
+                "granularity": granularity,
+                "year": year,
+                "month": month if granularity == "month" else None,
+                "week_number": week_number if granularity == "week" else None,
                 "range_start": range_start.isoformat(),
                 "range_end": range_end.isoformat(),
             },
-            "jours_ouvrables": jours_ouvrables,
-            "demi_journees_possibles": demi_journees_possibles,
-            "utilisateurs": sorted(
-                users_result, key=lambda x: -x["demi_journees_travaillees"]
+            "working_days": working_days,
+            "possible_half_days": possible_half_days,
+            "users": sorted(
+                users_result, key=lambda x: -x["worked_half_days"]
             ),
-            "projets": sorted(
-                (v for v in projet_totals.values() if v["nom"] not in exclude_projets),
-                key=lambda x: -x["demi_journees"],
+            "projects": sorted(
+                (v for v in project_totals.values() if v["name"] not in exclude_projects),
+                key=lambda x: -x["half_days"],
             ),
-            "codes_pointage": sorted(
+            "tracking_codes": sorted(
                 code_totals.values(),
-                key=lambda x: -x["demi_journees"],
+                key=lambda x: -x["half_days"],
             ),
-            "tendance": tendance,
+            "trend": trend,
         }
     ), 200

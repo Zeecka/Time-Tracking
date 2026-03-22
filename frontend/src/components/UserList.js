@@ -1,41 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, Button, Modal, Form, Alert } from 'react-bootstrap';
-import { codePointageAPI } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import { userAPI } from '../services/api';
 
-function CodePointageList() {
-  const [codePointages, setCodePointages] = useState([]);
+function UserList() {
+  const { t } = useTranslation();
+  const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ code: '', note: '' });
+  const [formData, setFormData] = useState({ name: '', color: '#3498db' });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const importInputRef = useRef(null);
 
-  useEffect(() => {
-    loadCodePointages();
-  }, []);
-
-  const loadCodePointages = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await codePointageAPI.getAll();
-      setCodePointages(response.data);
+      const response = await userAPI.getAll();
+      setUsers(response.data);
     } catch (err) {
-      setError('Erreur lors du chargement des codes pointage');
+      setError(t('user.errorLoad'));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleShowModal = (item = null) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ code: item.code, note: item.note || '' });
+      setFormData({ name: item.name, color: item.color });
     } else {
       setEditingItem(null);
-      setFormData({ code: '', note: '' });
+      setFormData({ name: '', color: '#3498db' });
     }
     setShowModal(true);
     setError('');
@@ -44,7 +46,7 @@ function CodePointageList() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingItem(null);
-    setFormData({ code: '', note: '' });
+    setFormData({ name: '', color: '#3498db' });
     setError('');
   };
 
@@ -52,24 +54,24 @@ function CodePointageList() {
     e.preventDefault();
     try {
       if (editingItem) {
-        await codePointageAPI.update(editingItem.id, formData);
+        await userAPI.update(editingItem.id, formData);
       } else {
-        await codePointageAPI.create(formData);
+        await userAPI.create(formData);
       }
       handleCloseModal();
-      loadCodePointages();
+      loadUsers();
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de la sauvegarde');
+      setError(err.response?.data?.error || t('user.errorSave'));
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce code pointage ?')) {
+    if (window.confirm(t('user.deleteConfirm', { name: users.find((u) => u.id === id)?.name || '' }))) {
       try {
-        await codePointageAPI.delete(id);
-        loadCodePointages();
+        await userAPI.delete(id);
+        loadUsers();
       } catch (err) {
-        setError(err.response?.data?.error || 'Erreur lors de la suppression');
+        setError(err.response?.data?.error || t('user.errorDelete'));
       }
     }
   };
@@ -87,11 +89,11 @@ function CodePointageList() {
 
   const handleExportCSV = async () => {
     try {
-      const response = await codePointageAPI.exportCSV();
-      downloadBlob(response.data, 'codes_pointage.csv');
-      setMessage('Export CSV des codes terminé.');
+      const response = await userAPI.exportCSV();
+      downloadBlob(response.data, 'users.csv');
+      setMessage(t('user.exportCsvSuccess') || 'CSV export done.');
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l’export CSV');
+      setError(err.response?.data?.error || t('user.errorExportCsv'));
     }
   };
 
@@ -106,14 +108,14 @@ function CodePointageList() {
     }
 
     try {
-      const response = await codePointageAPI.importCSV(file);
+      const response = await userAPI.importCSV(file);
       const data = response.data || {};
       setMessage(
-        `Import CSV codes terminé : ${data.created || 0} créé(s), ${data.skipped || 0} ignoré(s), ${(data.errors || []).length} erreur(s).`
+        t('user.importSuccess', { created: data.created || 0, updated: data.updated || 0 })
       );
-      loadCodePointages();
+      loadUsers();
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l’import CSV');
+      setError(err.response?.data?.error || t('user.errorImportCsv'));
     } finally {
       e.target.value = '';
     }
@@ -123,27 +125,27 @@ function CodePointageList() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0" style={{ fontWeight: 700 }}>
-          <i className="fas fa-tags me-2" style={{ color: '#e67e22' }}></i>
-          Codes Pointage
+          <i className="fas fa-users me-2" style={{ color: '#9b59b6' }}></i>
+          {t('user.title')}
         </h2>
         <Button variant="primary" onClick={() => handleShowModal()}>
           <i className="fas fa-plus me-2"></i>
-          Nouveau Code
+          {t('user.new')}
         </Button>
       </div>
 
       <div className="d-flex gap-2 mb-3">
         <Button variant="outline-primary" size="sm" onClick={handleImportClick}>
           <i className="fas fa-file-import me-2"></i>
-          Import CSV
+          {t('user.importCsv')}
         </Button>
         <Button variant="outline-success" size="sm" onClick={handleExportCSV}>
           <i className="fas fa-file-export me-2"></i>
-          Export CSV
+          {t('user.exportCsv')}
         </Button>
-        <Button variant="outline-secondary" size="sm" as="a" href="/examples/codes_pointage_exemple.csv" download>
+        <Button variant="outline-secondary" size="sm" as="a" href="/examples/users_example.csv" download>
           <i className="fas fa-download me-2"></i>
-          CSV exemple
+          {t('common.csvExample') || 'CSV example'}
         </Button>
         <Form.Control
           ref={importInputRef}
@@ -158,27 +160,44 @@ function CodePointageList() {
       {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
 
       {loading ? (
-        <p>Chargement...</p>
+        <p>{t('common.loading')}</p>
       ) : (
-        <Table striped bordered hover className="code-pointage-table">
+        <Table striped bordered hover className="user-table">
           <thead>
             <tr>
-              <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>Code</th>
-              <th>Note</th>
-              <th style={{ textAlign: 'center' }}>Actions</th>
+              <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>{t('user.name')}</th>
+              <th style={{ fontFamily: 'monospace', textAlign: 'center' }}>{t('grid.createdAt') || 'Created at'}</th>
+              <th style={{ textAlign: 'center' }}>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {codePointages.map((item) => (
+            {users.map((item) => (
               <tr key={item.id}>
-                <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>{item.code}</td>
-                <td>{item.note || ''}</td>
+                <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                  <div className="d-flex align-items-center gap-2 justify-content-center">
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: item.color,
+                        border: '1px solid #999',
+                        borderRadius: '3px',
+                        flexShrink: 0,
+                      }}
+                      title={item.color}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                </td>
+                <td style={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </td>
                 <td style={{ textAlign: 'center' }}>
                   <div className="d-flex align-items-center justify-content-center gap-2">
                     <Button
                       variant="outline-warning"
                       size="sm"
-                      title="Modifier"
+                      title={t('common.edit')}
                       onClick={() => handleShowModal(item)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -188,7 +207,7 @@ function CodePointageList() {
                     <Button
                       variant="outline-danger"
                       size="sm"
-                      title="Supprimer"
+                      title={t('common.delete')}
                       onClick={() => handleDelete(item.id)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -206,40 +225,50 @@ function CodePointageList() {
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
           <Modal.Title>
-            {editingItem ? 'Modifier' : 'Nouveau'} Code Pointage
+            {editingItem ? t('user.edit') : t('user.create')}
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
             {error && <Alert variant="danger">{error}</Alert>}
             <Form.Group className="mb-3">
-              <Form.Label>Code</Form.Label>
+              <Form.Label>{t('user.name')}</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="Entrez le code"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('user.namePlaceholder')}
                 required
                 maxLength={128}
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Note</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={formData.note}
-                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                placeholder="Note facultative"
-              />
+              <Form.Label>{t('user.color')}</Form.Label>
+              <div className="d-flex align-items-center">
+                <Form.Control
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  style={{ width: '60px', height: '40px', marginRight: '10px' }}
+                  required
+                />
+                <Form.Control
+                  type="text"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  placeholder="#RRGGBB"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  required
+                />
+              </div>
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseModal}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button variant="primary" type="submit">
-              Enregistrer
+              {t('common.save')}
             </Button>
           </Modal.Footer>
         </Form>
@@ -248,4 +277,4 @@ function CodePointageList() {
   );
 }
 
-export default CodePointageList;
+export default UserList;
