@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Form, Alert, Row, Col, Card, Table } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -50,31 +50,31 @@ const formatDateDDMMYYYY = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
-  if (!dateDebut || !dateFin) return 0;
+const calculateDays = (startDate, startPeriod, endDate, endPeriod) => {
+  if (!startDate || !endDate) return 0;
 
-  const debut = new Date(dateDebut);
-  const fin = new Date(dateFin);
-  const diffTime = fin - debut;
+  const rangeStart = new Date(startDate);
+  const rangeEnd = new Date(endDate);
+  const diffTime = rangeEnd - rangeStart;
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
   let days = diffDays;
 
-  if (dateDebut === dateFin) {
-    if (periodeDebut === 'morning' && periodeFin === 'evening') {
+  if (startDate === endDate) {
+    if (startPeriod === 'morning' && endPeriod === 'evening') {
       days = 1;
-    } else if (periodeDebut === 'morning' && periodeFin === 'midday') {
+    } else if (startPeriod === 'morning' && endPeriod === 'midday') {
       days = 0.5;
-    } else if (periodeDebut === 'midday' && periodeFin === 'evening') {
+    } else if (startPeriod === 'midday' && endPeriod === 'evening') {
       days = 0.5;
     } else {
       days = 0.5;
     }
   } else {
-    if (periodeDebut === 'midday') {
+    if (startPeriod === 'midday') {
       days -= 0.5;
     }
-    if (periodeFin === 'midday') {
+    if (endPeriod === 'midday') {
       days += 0.5;
     } else {
       days += 1;
@@ -84,89 +84,104 @@ const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
   return Math.max(0, days);
 };
 
-const PERIODE_LABELS = {
-  morning: 'Morning',
-  midday: 'Midday',
-  evening: 'Evening',
-  journee: 'Journée',
-  apres_midi: 'Après-midi',
-};
-
-const EXPORT_COLUMNS = [
+const EXPORT_COLUMN_DEFS = [
   {
     id: 'year',
-    label: 'Year',
     width: 8,
-    getValue: (item) => item.year,
   },
   {
-    id: 'semaine',
-    label: 'Week',
+    id: 'week',
     width: 10,
-    getValue: (item) => item.week_number,
   },
   {
     id: 'user',
-    label: 'User',
     width: 20,
-    getValue: (item) => item.user?.name || 'N/A',
   },
   {
     id: 'project',
-    label: 'Project',
     width: 30,
-    getValue: (item) => item.project?.name || 'N/A',
   },
   {
     id: 'tracking_code',
-    label: 'Tracking Code',
     width: 15,
-    getValue: (item) => item.project?.tracking_code?.code || 'N/A',
   },
   {
     id: 'start_date',
-    label: 'Start Date',
     width: 12,
-    getValue: (item) => formatDateDDMMYYYY(item.start_date),
   },
   {
     id: 'start_period',
-    label: 'Start Period',
     width: 15,
-    getValue: (item) => PERIODE_LABELS[item.start_period] || item.start_period,
   },
   {
     id: 'end_date',
-    label: 'End Date',
     width: 12,
-    getValue: (item) => formatDateDDMMYYYY(item.end_date),
   },
   {
     id: 'end_period',
-    label: 'End Period',
     width: 15,
-    getValue: (item) => PERIODE_LABELS[item.end_period] || item.end_period,
   },
   {
     id: 'days',
-    label: 'Days',
     width: 8,
-    getValue: (item) => calculateDays(item.start_date, item.start_period, item.end_date, item.end_period),
   },
   {
     id: 'note',
-    label: 'Note',
     width: 50,
-    getValue: (item) => item.note || '',
   },
 ];
 
-const getDefaultSelectedColumns = () => EXPORT_COLUMNS.reduce((acc, column) => ({
+const getPeriodLabel = (period, t) => {
+  const keyMap = {
+    morning: 'periods.morning',
+    midday: 'periods.midday',
+    evening: 'periods.evening',
+    journee: 'periods.fullDay',
+    apres_midi: 'periods.afternoon',
+  };
+
+  const key = keyMap[period];
+  return key ? t(key) : period;
+};
+
+const getExportColumns = (t) => {
+  const notAvailable = t('common.notAvailable');
+
+  return EXPORT_COLUMN_DEFS.map((column) => {
+    switch (column.id) {
+      case 'year':
+        return { ...column, label: t('common.year'), getValue: (item) => item.year };
+      case 'week':
+        return { ...column, label: t('common.week'), getValue: (item) => item.week_number };
+      case 'user':
+        return { ...column, label: t('timeEntry.user'), getValue: (item) => item.user?.name || notAvailable };
+      case 'project':
+        return { ...column, label: t('timeEntry.project'), getValue: (item) => item.project?.name || notAvailable };
+      case 'tracking_code':
+        return { ...column, label: t('project.trackingCode'), getValue: (item) => item.project?.tracking_code?.code || notAvailable };
+      case 'start_date':
+        return { ...column, label: t('timeEntry.startDate'), getValue: (item) => formatDateDDMMYYYY(item.start_date) };
+      case 'start_period':
+        return { ...column, label: t('timeEntry.startPeriod'), getValue: (item) => getPeriodLabel(item.start_period, t) };
+      case 'end_date':
+        return { ...column, label: t('timeEntry.endDate'), getValue: (item) => formatDateDDMMYYYY(item.end_date) };
+      case 'end_period':
+        return { ...column, label: t('timeEntry.endPeriod'), getValue: (item) => getPeriodLabel(item.end_period, t) };
+      case 'days':
+        return { ...column, label: t('grid.days'), getValue: (item) => calculateDays(item.start_date, item.start_period, item.end_date, item.end_period) };
+      case 'note':
+      default:
+        return { ...column, label: t('common.note'), getValue: (item) => item.note || '' };
+    }
+  });
+};
+
+const getDefaultSelectedColumns = (columns) => columns.reduce((acc, column) => ({
   ...acc,
   [column.id]: true,
 }), {});
 
-const getActiveColumns = (selectedColumns) => EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]);
+const getActiveColumns = (selectedColumns, columns) => columns.filter((column) => selectedColumns[column.id]);
 
 const compareWeekYear = (left, right) => {
   if (left.year !== right.year) {
@@ -243,7 +258,7 @@ const sanitizeRangeFilters = (inputFilters) => {
 
 const formatWeekYearLabel = ({ year, week_number }) => `W${week_number}-${year}`;
 
-const buildStatsRows = (timeEntries, rangeLabel) => {
+const buildStatsRows = (timeEntries, rangeLabel, t) => {
   const totalJours = timeEntries.reduce((sum, item) => (
     sum + calculateDays(item.start_date, item.start_period, item.end_date, item.end_period)
   ), 0);
@@ -254,15 +269,15 @@ const buildStatsRows = (timeEntries, rangeLabel) => {
   timeEntries.forEach((item) => {
     const jours = calculateDays(item.start_date, item.start_period, item.end_date, item.end_period);
 
-    const userName = item.user?.name || 'N/A';
+    const userName = item.user?.name || t('common.notAvailable');
     if (!usersMap[userName]) {
       usersMap[userName] = { jours: 0, entries: 0 };
     }
     usersMap[userName].jours += jours;
     usersMap[userName].entries += 1;
 
-    const projectName = item.project?.name || 'N/A';
-    const trackingCode = item.project?.tracking_code?.code || 'N/A';
+    const projectName = item.project?.name || t('common.notAvailable');
+    const trackingCode = item.project?.tracking_code?.code || t('common.notAvailable');
     const projectKey = `${projectName}__${trackingCode}`;
     if (!projectsMap[projectKey]) {
       projectsMap[projectKey] = {
@@ -285,25 +300,26 @@ const buildStatsRows = (timeEntries, rangeLabel) => {
     .sort((left, right) => right[2] - left[2]);
 
   return [
-    ['Export Summary'],
-    ['Period', rangeLabel],
-    ['Time entries exported', timeEntries.length],
-    ['Total days', Number(totalJours.toFixed(2))],
-    ['Unique users', Object.keys(usersMap).length],
-    ['Unique projects', Object.keys(projectsMap).length],
+    [t('export.summaryTitle')],
+    [t('export.periodLabel'), rangeLabel],
+    [t('export.entriesExported'), timeEntries.length],
+    [t('export.totalDays'), Number(totalJours.toFixed(2))],
+    [t('export.uniqueUsers'), Object.keys(usersMap).length],
+    [t('export.uniqueProjects'), Object.keys(projectsMap).length],
     [],
-    ['Breakdown by user'],
-    ['User', 'Days', 'Entries'],
+    [t('export.breakdownByUser')],
+    [t('timeEntry.user'), t('grid.days'), t('export.entriesLabel')],
     ...usersRows,
     [],
-    ['Breakdown by project'],
-    ['Project', 'Tracking Code', 'Days', 'Entries'],
+    [t('export.breakdownByProject')],
+    [t('timeEntry.project'), t('project.trackingCode'), t('grid.days'), t('export.entriesLabel')],
     ...projectsRows,
   ];
 };
 
 function ExportExcel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const exportColumns = useMemo(() => getExportColumns(t), [t]);
   const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
   const [filters, setFilters] = useState({
     start_year: CURRENT_WEEK_INFO.year,
@@ -312,7 +328,7 @@ function ExportExcel() {
     end_week_number: CURRENT_WEEK_INFO.week,
   });
   const [timeEntries, setTimeEntries] = useState([]);
-  const [selectedColumns, setSelectedColumns] = useState(getDefaultSelectedColumns);
+  const [selectedColumns, setSelectedColumns] = useState(() => getDefaultSelectedColumns(EXPORT_COLUMN_DEFS));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -385,7 +401,7 @@ function ExportExcel() {
       return;
     }
 
-    const activeColumns = getActiveColumns(selectedColumns);
+    const activeColumns = getActiveColumns(selectedColumns, exportColumns);
     if (activeColumns.length === 0) {
       setError(t('grid.selectColumns'));
       return;
@@ -405,19 +421,19 @@ function ExportExcel() {
       const wb = XLSX.utils.book_new();
       const timeEntriesSheet = XLSX.utils.json_to_sheet(excelData);
       timeEntriesSheet['!cols'] = activeColumns.map((column) => ({ wch: column.width }));
-      XLSX.utils.book_append_sheet(wb, timeEntriesSheet, 'Time Entries');
+      XLSX.utils.book_append_sheet(wb, timeEntriesSheet, t('export.sheetTimeEntries'));
 
       const statsRangeLabel = `${formatWeekYearLabel({
         year: filters.start_year,
         week_number: filters.start_week_number,
-      })} to ${formatWeekYearLabel({
+      })} ${t('common.to')} ${formatWeekYearLabel({
         year: filters.end_year,
         week_number: filters.end_week_number,
       })}`;
-      const statsRows = buildStatsRows(timeEntries, statsRangeLabel);
+      const statsRows = buildStatsRows(timeEntries, statsRangeLabel, t);
       const statsSheet = XLSX.utils.aoa_to_sheet(statsRows);
       statsSheet['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 12 }];
-      XLSX.utils.book_append_sheet(wb, statsSheet, 'Stats');
+      XLSX.utils.book_append_sheet(wb, statsSheet, t('export.sheetStats'));
       const fileName = `time_entries_${filters.start_year}_W${filters.start_week_number}_to_${filters.end_year}_W${filters.end_week_number}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
@@ -432,21 +448,30 @@ function ExportExcel() {
 
   const startWeekRange = getIsoWeekDateRange(filters.start_year, filters.start_week_number);
   const endWeekRange = getIsoWeekDateRange(filters.end_year, filters.end_week_number);
-  const formatShortDate = (date) => new Intl.DateTimeFormat('en-US', {
+  const currentLocale = useMemo(() => {
+    const requestedLocale = i18n.resolvedLanguage || i18n.language;
+    if (!requestedLocale) {
+      return 'en-US';
+    }
+    const supportedLocales = Intl.DateTimeFormat.supportedLocalesOf([requestedLocale]);
+    return supportedLocales[0] || 'en-US';
+  }, [i18n.language, i18n.resolvedLanguage]);
+
+  const formatShortDate = (date) => new Intl.DateTimeFormat(currentLocale, {
     day: 'numeric',
     month: 'long',
     timeZone: 'UTC',
   }).format(date);
-  const selectedWeekLabel = `Mon ${formatShortDate(startWeekRange.monday)} ${filters.start_year} – Fri ${formatShortDate(endWeekRange.friday)} ${filters.end_year}`;
-  const selectedColumnCount = EXPORT_COLUMNS.filter((column) => selectedColumns[column.id]).length;
-  const previewColumns = getActiveColumns(selectedColumns);
+  const selectedWeekLabel = `${t('days.monday')} ${formatShortDate(startWeekRange.monday)} ${filters.start_year} ${t('common.to')} ${t('days.friday')} ${formatShortDate(endWeekRange.friday)} ${filters.end_year}`;
+  const selectedColumnCount = exportColumns.filter((column) => selectedColumns[column.id]).length;
+  const previewColumns = getActiveColumns(selectedColumns, exportColumns);
 
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 className="mb-0" style={{ fontWeight: 700 }}>
           <i className="fas fa-file-excel me-2" style={{ color: '#27ae60' }}></i>
-          Export Excel
+          {t('export.title')}
         </h2>
       </div>
 
@@ -525,7 +550,7 @@ function ExportExcel() {
         </Card.Header>
         <Card.Body>
           <Row>
-            {EXPORT_COLUMNS.map((column) => (
+            {exportColumns.map((column) => (
               <Col key={column.id} md={4} className="mb-2">
                 <Form.Check
                   type="checkbox"

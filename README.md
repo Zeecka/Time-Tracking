@@ -1,5 +1,9 @@
 # Time Tracking Application
 
+<p align="center">
+	<img src="docs/assets/timetrack.png" alt="TimeTrack logo" width="220" />
+</p>
+
 ![Backend Flask](https://img.shields.io/badge/Backend-Flask-000000?logo=flask)
 ![Frontend React](https://img.shields.io/badge/Frontend-React-20232A?logo=react)
 ![Database MariaDB](https://img.shields.io/badge/Database-MariaDB-003545?logo=mariadb)
@@ -18,10 +22,10 @@ A web application for time tracking management, built to replace Excel pivot tab
 
 ### Data Model
 
-1. **CodePointage**: Unique tracking code (128 characters)
-2. **Projet**: Unique project name, linked to a tracking code (many-to-one relationship)
-3. **Utilisateur**: Name, identification color, future OIDC support
-4. **Pointage**: Time entry with number of days, week number, year, user, and project
+1. **TrackingCode**: Unique tracking code (128 characters)
+2. **Project**: Unique project name, linked to a tracking code (many-to-one relationship)
+3. **User**: Name, identification color, future OIDC support
+4. **TimeEntry**: Time entry with number of days, week number, year, user, and project
 
 ## Quick Start
 
@@ -116,10 +120,10 @@ Technical documentation (project structure + REST API): [docs/README_DEV.md](doc
 - CSV import for **Users**, **Tracking Codes**, **Projects**, and **Time Entries**
 - CSV export for **Users**, **Tracking Codes**, **Projects**, and **Time Entries**
 - Sample CSV files downloadable from the interface:
-	- `/examples/utilisateurs_exemple.csv`
-	- `/examples/codes_pointage_exemple.csv`
-	- `/examples/projets_exemple.csv`
-	- `/examples/pointages_exemple.csv`
+	- `/examples/users_example.csv`
+	- `/examples/tracking_codes_example.csv`
+	- `/examples/projects_example.csv`
+	- `/examples/time_entries_example.csv`
 
 ## Development
 

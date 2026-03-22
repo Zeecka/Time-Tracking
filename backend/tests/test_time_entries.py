@@ -17,7 +17,7 @@ import io
 # Helpers
 # ---------------------------------------------------------------------------
 
-BASE = "/api/v1/time-entries"
+BASE = "/api/v1/time-entry"
 
 
 def make_payload(user_id, project_id, **kwargs):
@@ -48,9 +48,7 @@ def put_time_entry(client, entry_id, payload):
 
 class TestTimeEntryCsvImportExport:
     def test_export_time_entry_csv(self, client, user_alice, project_dev):
-        rv_create = post_time_entry(
-            client, make_payload(user_alice.id, project_dev.id)
-        )
+        rv_create = post_time_entry(client, make_payload(user_alice.id, project_dev.id))
         assert rv_create.status_code == 201
 
         rv = client.get(f"{BASE}/export-csv")
@@ -68,6 +66,43 @@ class TestTimeEntryCsvImportExport:
         rv = client.post(
             f"{BASE}/import-csv",
             data={"file": (io.BytesIO(csv_content.encode("utf-8")), "entries.csv")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 1
+        assert len(data["errors"]) == 0
+
+    def test_import_time_entry_csv_with_unknown_project(
+        self, client, user_alice, project_dev
+    ):
+        csv_content = (
+            "start_date,start_period,end_date,end_period,week_number,year,user,project,note\n"
+            "2026-03-02,morning,2026-03-02,evening,10,2026,Alice,UNKNOWN,Import test\n"
+        )
+        rv = client.post(
+            f"{BASE}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "entries.csv")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data["created"] == 0
+        assert len(data["errors"]) == 1
+        assert "Project not found" in data["errors"][0]["error"]
+
+    def test_import_time_entry_excel_like_file_with_valid_csv_content(
+        self, client, user_alice, project_dev
+    ):
+        csv_content = (
+            "start_date,start_period,end_date,end_period,week_number,year,user,project,note\n"
+            "2026-03-03,morning,2026-03-03,evening,10,2026,Alice,Development,Imported from xlsx name\n"
+        )
+        rv = client.post(
+            f"{BASE}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "entries.xlsx")},
             content_type="multipart/form-data",
         )
 
@@ -309,6 +344,78 @@ class TestOverlapDetection:
             {"end_date": "2026-03-02", "end_period": "evening"},
         )
         assert rv3.status_code == 409
+
+
+class TestConflictOverwrite:
+    def test_overwrite_conflicts_splits_overlapped_entry(
+        self, client, user_alice, project_dev, project_bug
+    ):
+        rv_existing = post_time_entry(
+            client,
+            make_payload(
+                user_alice.id,
+                project_dev.id,
+                start_date="2026-03-02",
+                start_period="morning",
+                end_date="2026-03-06",
+                end_period="evening",
+            ),
+        )
+        assert rv_existing.status_code == 201
+
+        rv_conflict = post_time_entry(
+            client,
+            make_payload(
+                user_alice.id,
+                project_bug.id,
+                start_date="2026-03-03",
+                start_period="midday",
+                end_date="2026-03-04",
+                end_period="evening",
+            ),
+        )
+        assert rv_conflict.status_code == 409
+
+        rv_overwrite = post_time_entry(
+            client,
+            make_payload(
+                user_alice.id,
+                project_bug.id,
+                start_date="2026-03-03",
+                start_period="midday",
+                end_date="2026-03-04",
+                end_period="evening",
+                overwrite_conflicts=True,
+            ),
+        )
+        assert rv_overwrite.status_code == 201
+
+        rv_list = client.get(f"{BASE}?user_id={user_alice.id}&week_number=10&year=2026")
+        assert rv_list.status_code == 200
+
+        entries = sorted(
+            rv_list.get_json(),
+            key=lambda item: (item["start_date"], item["start_period"]),
+        )
+        assert len(entries) == 3
+
+        assert entries[0]["project"]["name"] == "Development"
+        assert entries[0]["start_date"] == "2026-03-02"
+        assert entries[0]["start_period"] == "morning"
+        assert entries[0]["end_date"] == "2026-03-03"
+        assert entries[0]["end_period"] == "midday"
+
+        assert entries[1]["project"]["name"] == "Bug Fix"
+        assert entries[1]["start_date"] == "2026-03-03"
+        assert entries[1]["start_period"] == "midday"
+        assert entries[1]["end_date"] == "2026-03-04"
+        assert entries[1]["end_period"] == "evening"
+
+        assert entries[2]["project"]["name"] == "Development"
+        assert entries[2]["start_date"] == "2026-03-05"
+        assert entries[2]["start_period"] == "morning"
+        assert entries[2]["end_date"] == "2026-03-06"
+        assert entries[2]["end_period"] == "evening"
 
 
 # ---------------------------------------------------------------------------
@@ -572,9 +679,7 @@ class TestProjectExtension:
     """User extends (updates) a time entry so it becomes adjacent to another
     entry; the backend must merge them automatically."""
 
-    def test_extend_end_date_merges_adjacent(
-        self, client, user_alice, project_dev
-    ):
+    def test_extend_end_date_merges_adjacent(self, client, user_alice, project_dev):
         """Extend a Monday entry to include Tuesday → the pre-existing Wednesday
         entry becomes adjacent and is automatically merged.
 
@@ -690,9 +795,7 @@ class TestBulkCreate:
         assert data["created"] >= 1
         assert len(data["errors"]) >= 1
 
-    def test_bulk_missing_field_reports_error(
-        self, client, user_alice, project_dev
-    ):
+    def test_bulk_missing_field_reports_error(self, client, user_alice, project_dev):
         """A bulk entry missing a required field gets an individual error."""
         bulk = {
             "time_entries": [
@@ -759,9 +862,7 @@ class TestValidation:
         )
         assert rv.status_code == 400
 
-    def test_date_outside_declared_week_rejected(
-        self, client, user_alice, project_dev
-    ):
+    def test_date_outside_declared_week_rejected(self, client, user_alice, project_dev):
         """Declared week 10 but date is in week 11 — must be rejected."""
         rv = post_time_entry(
             client,
@@ -814,9 +915,7 @@ class TestValidation:
 
 
 class TestFiltering:
-    def test_filter_by_user(
-        self, client, user_alice, user_bob, project_dev
-    ):
+    def test_filter_by_user(self, client, user_alice, user_bob, project_dev):
         post_time_entry(client, make_payload(user_alice.id, project_dev.id))
         post_time_entry(
             client,

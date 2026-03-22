@@ -1,37 +1,41 @@
-# Copilot instructions for `pointage`
+# Project Guidelines
 
-## Big picture architecture
-- Monorepo with two apps: Flask API in `backend/` and React UI in `frontend/`, orchestrated via Docker Compose (`compose.dev.yml`, `compose.yml`).
-- Backend uses Flask application factory (`backend/app/__init__.py`) and registers blueprints under `/api/v1/*` (`code-pointage`, `projets`, `utilisateurs`, `pointages`, `stats`, `analyzer`).
-- Data model is relational (`backend/app/models.py`): `CodePointage -> Projet -> Pointage`, with `Utilisateur` linked to `Pointage`.
-- Serialization is via Marshmallow auto-schemas (`backend/app/schemas.py`) with nested objects returned in API responses.
+## Build And Test
+- Prefer Docker-first development.
+- Start dev stack with live reload: `docker compose -f compose.dev.yml up --build --watch`.
+- Services in dev: frontend `http://localhost:3000`, backend `http://localhost:5000`, MariaDB `localhost:3306`.
+- Production-like stack: `docker compose -f compose.yml up -d --build`.
+- Backend tests run without external DB: `cd backend && pip install -r requirements-test.txt && pytest --tb=short -q`.
+- Frontend local workflow: `cd frontend && npm ci && npm start`.
+- Frontend production build: `cd frontend && npm ci && npm run build`.
 
-## Domain rules you must preserve
-- Domain language is French and API fields are French (`numero_semaine`, `annee`, `date_debut`, `periode_fin`, etc.); keep naming consistent.
-- `Pointage` periods are half-day based and normalized to `morning|midday|evening`; legacy inputs (`journee`, `apres_midi`, `matin`, `midi`, `soir`, `full_day`, `fullday`, `afternoon`) are still accepted in backend normalization (`backend/app/routes/pointage.py`).
-- Week/year logic is ISO-based: `date_debut` and `date_fin` must belong to the provided ISO week/year.
-- Overlap detection is strict per user and returns `409` on conflicts.
-- Adjacent pointages for same user+project are auto-merged (including note concatenation), so avoid changes that break merge semantics.
-- Protected deletes are expected: delete code/projet/utilisateur with linked children returns `409`.
+## Architecture
+- Backend is a Flask app-factory (`backend/app/__init__.py`) with blueprints under `backend/app/routes/`.
+- API prefix is `/api/v1` and resource paths are singular: `/tracking-code`, `/project`, `/user`, `/time-entry`, `/stats`.
+- Core backend layers:
+  - Models: `backend/app/models.py`
+  - Schemas: `backend/app/schemas.py`
+  - Route handlers: `backend/app/routes/*.py`
+- Frontend is React with route-centric pages in `frontend/src/components/` and Axios API wrappers in `frontend/src/services/api.js`.
+- i18n resources are in `frontend/src/i18n/en.json` and `frontend/src/i18n/fr.json`.
 
-## Developer workflows
-- Preferred dev run: `docker compose -f compose.dev.yml up --build --watch`.
-- Backend dev container command auto-resets and seeds DB on startup (`flask init-db --reset && flask seed-dev && flask run ...`).
-- Backend prod container starts with `entrypoint.sh` (`flask init-db`, then gunicorn).
-- No migration tool is used; schema is created with `db.create_all()` and managed by `flask init-db [--reset]`.
+## Conventions
+- Keep endpoint names and payload identifiers in English.
+- For backend route changes, preserve existing response behavior where practical:
+  - `201` on create success
+  - `404` when resource not found
+  - `409` for uniqueness/conflict cases
+- Keep validation close to route logic and return explicit JSON error messages.
+- Preserve time-entry domain behavior: overlap detection and merge semantics are business-critical.
+- Prefer adding or updating tests in `backend/tests/` for backend behavior changes.
 
-## Testing and validation
-- Backend tests are in `backend/tests/` and use in-memory SQLite testing config (`create_app("testing")` in `backend/tests/conftest.py`).
-- Run backend tests with test deps installed: `cd backend && pip install -r requirements-test.txt && pytest`.
-- Tests encode behavioral contracts (especially `409` conflict cases and merge/overlap behavior); update tests when intentionally changing those rules.
+## Pitfalls
+- No migration framework is configured. Schema updates typically require DB reset (`flask init-db --reset`) and reseed (`flask seed-dev`) in dev.
+- Frontend uses `react-scripts@5`; keep `typescript` pinned to `4.9.5` unless the toolchain is upgraded.
+- Docker builds rely on lockfiles and deterministic installs (`npm ci`).
 
-## Frontend integration patterns
-- API client is centralized in `frontend/src/services/api.js` using `REACT_APP_API_URL` (default `http://localhost:5000/api/v1`).
-- Keep endpoint paths aligned with backend blueprints (`/pointages/bulk`, `/stats`, etc.).
-- `PointageGrid` (`frontend/src/components/PointageGrid.js`) duplicates critical ISO-week and period normalization logic for UX; keep frontend/back validation semantics aligned.
-- Project visual motifs (`uni`, `raye`, `pointille`) are used in multiple components (e.g., `ProjetList`, `PointageGrid`), so preserve motif values and meaning.
-
-## When adding/changing backend features
-- Add or update route modules in `backend/app/routes/` and export blueprints in `backend/app/routes/__init__.py`.
-- Keep response style consistent: JSON `{ "error": "..." }` for failures, `201` for create, `204` for successful delete.
-- Prefer preserving existing API contracts over refactors, because frontend components call these endpoints directly with current field names.
+## Useful References
+- High-level overview: `README.md`
+- Developer workflow and API details: `docs/README_DEV.md`
+- CI pipeline: `.github/workflows/ci.yml`
+- Backend test fixtures and isolation strategy: `backend/tests/conftest.py`

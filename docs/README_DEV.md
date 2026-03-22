@@ -20,10 +20,11 @@ pointage/
 │       ├── schemas.py        # Marshmallow schemas
 │       ├── extensions.py     # Flask extensions
 │       └── routes/           # REST API blueprints
-│           ├── code_pointage.py
-│           ├── projet.py
-│           ├── utilisateur.py
-│           └── pointage.py
+│           ├── tracking_code.py
+│           ├── project.py
+│           ├── user.py
+│           ├── time_entry.py
+│           └── stats.py
 ├── frontend/                  # React application
 │   ├── Dockerfile
 │   ├── package.json

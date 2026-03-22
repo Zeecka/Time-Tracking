@@ -3,11 +3,8 @@ services:
     image: mariadb:11.2
     container_name: pointage_db_dev
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    env_file:
+      - .env
     volumes:
       - mariadb_data_dev:/var/lib/mysql
     ports:
@@ -26,14 +23,13 @@ services:
       dockerfile: Dockerfile
     container_name: pointage_backend_dev
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       FLASK_APP: app
       FLASK_ENV: development
       FLASK_DEBUG: "1"
       DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
-      SECRET_KEY: ${SECRET_KEY}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      STATS_EXCLUDE_PROJECTS: ${STATS_EXCLUDE_PROJECTS:-}
     volumes:
       - ./backend:/app
     ports:
@@ -43,6 +39,7 @@ services:
         condition: service_healthy
     networks:
       - pointage_network_dev
+    #command: sh -c "flask init-db --reset && flask run --host=0.0.0.0 --port=5000 --debug"
     command: sh -c "flask init-db --reset && flask seed-dev && flask run --host=0.0.0.0 --port=5000 --debug"
     develop:
       watch:
@@ -64,8 +61,9 @@ services:
       target: dev
     container_name: pointage_frontend_dev
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      REACT_APP_API_URL: ${REACT_APP_API_URL}
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     volumes:

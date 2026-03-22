@@ -1,0 +1,3 @@
+start_date,start_period,end_date,end_period,week_number,year,user,project,note
+2026-03-02,morning,2026-03-02,evening,10,2026,Alice,Development,Development sprint
+2026-03-03,morning,2026-03-03,midday,10,2026,Bob,Bug Fix,Anomaly fixes

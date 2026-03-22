@@ -9,14 +9,16 @@
     "projects": "Projets",
     "trackingCodes": "Codes Pointage",
     "users": "Utilisateurs",
-    "export": "Export Excel",
+    "export": "Export",
     "currentTheme": "Thème actuel",
     "toggleTheme": "Changer le thème"
   },
   "periods": {
     "morning": "Matin",
     "midday": "Midi",
-    "evening": "Soir"
+    "evening": "Soir",
+    "fullDay": "Journée",
+    "afternoon": "Après-midi"
   },
   "days": {
     "monday": "Lundi",
@@ -71,7 +73,8 @@
     "andMore": "et",
     "moreEntries": "plus de pointages",
     "halfDayAbbr": "demi-j",
-    "optional": "(facultatif)"
+    "optional": "(facultatif)",
+    "notAvailable": "N/A"
   },
   "home": {
     "title": "Pointage",
@@ -170,21 +173,28 @@
     "endDate": "Date de fin",
     "startPeriod": "Période de début",
     "endPeriod": "Période de fin",
+    "period": "Période",
     "weekNumber": "Numéro de semaine",
     "year": "Année",
     "user": "Utilisateur",
     "project": "Projet",
     "note": "Note",
+    "deleteTitle": "Supprimer le pointage",
     "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce pointage ?",
+    "deleteIrreversible": "Cette action ne peut pas être annulée.",
     "errorLoad": "Erreur lors du chargement des pointages",
     "errorSave": "Erreur lors de la sauvegarde du pointage",
     "errorDelete": "Erreur lors de la suppression du pointage",
     "errorResize": "Erreur lors du redimensionnement du pointage",
+    "errorOverlapWithProject": "Ce pointage chevauche une entree existante pour cet utilisateur (projet : {{project}})",
     "errorExportCsv": "Erreur lors de l'export CSV",
     "errorImportCsv": "Erreur lors de l'import CSV",
+    "errorResolveConflicts": "Erreur lors de la résolution des conflits",
     "noEntriesToExport": "Aucun pointage à exporter",
     "exportCsv": "Exporter CSV",
     "importCsv": "Importer CSV",
+    "exportCsvSuccess": "Export CSV des pointages effectué pour la semaine filtrée.",
+    "importSummary": "Import CSV des pointages : {{created}} créé(s), {{errors}} erreur(s).",
     "created": "Pointage créé avec succès",
     "updated": "Pointage modifié avec succès",
     "deleted": "Pointage supprimé avec succès",
@@ -213,7 +223,15 @@
     "ganttLeftClick": "Clic gauche: modifier",
     "ganttRightClick": "Clic droit: supprimer",
     "ganttResize": "Poignées: étirer/réduire",
-    "groupedView": "Vue regroupée"
+    "groupedView": "Vue regroupée",
+    "resource": "Ressource",
+    "selectedWeekLabel": "{{startDay}} {{startDate}} - {{endDay}} {{endDate}}",
+    "conflictDetected": "Conflit détecté",
+    "conflictDescription_one": "La période sélectionnée chevauche {{count}} pointage existant.",
+    "conflictDescription_other": "La période sélectionnée chevauche {{count}} pointage(s) existant(s).",
+    "conflictEntriesTitle": "Pointages en conflit :",
+    "conflictWarning": "En confirmant, les portions qui chevauchent seront ecrasees. Les segments hors chevauchement seront conserves.",
+    "confirmAndSave": "Confirmer et enregistrer"
   },
   "stats": {
     "title": "Statistiques",
@@ -258,7 +276,7 @@
     "presenceLevelLow": "Faible présence"
   },
   "export": {
-    "title": "Export Excel",
+    "title": "Export",
     "selectWeek": "Sélectionner une semaine",
     "selectYear": "Sélectionner une année",
     "selectColumns": "Sélectionner les colonnes à exporter",
@@ -272,6 +290,17 @@
     "endWeek": "Semaine de fin",
     "columnsSelected": "colonne(s) sélectionnée(s)",
     "dataPreview": "Aperçu des données",
-    "exporting": "Export en cours..."
+    "exporting": "Export en cours...",
+    "summaryTitle": "Résumé de l'export",
+    "periodLabel": "Période",
+    "entriesExported": "Pointages exportés",
+    "totalDays": "Total jours",
+    "uniqueUsers": "Utilisateurs uniques",
+    "uniqueProjects": "Projets uniques",
+    "breakdownByUser": "Répartition par utilisateur",
+    "breakdownByProject": "Répartition par projet",
+    "entriesLabel": "Entrées",
+    "sheetTimeEntries": "Pointages",
+    "sheetStats": "Statistiques"
   }
 }

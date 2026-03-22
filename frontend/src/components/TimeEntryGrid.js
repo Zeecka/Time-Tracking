@@ -70,7 +70,7 @@ const getIsoWeekDateRange = (year, week) => {
   };
 };
 
-const formatFrenchShortDate = (date) => new Intl.DateTimeFormat('en-US', {
+const formatShortDate = (date, locale = 'en-US') => new Intl.DateTimeFormat(locale, {
   day: 'numeric',
   month: 'long',
   timeZone: 'UTC',
@@ -82,40 +82,37 @@ const formatDateDDMMYYYY = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-const getDayName = (dateString) => {
+const getDayName = (dateString, locale = 'en-US') => {
   if (!dateString) return '';
   const date = new Date(dateString + 'T00:00:00Z');
-  return new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(date);
 };
 
-const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
-  if (!dateDebut || !dateFin) return 0;
+const calculateDays = (startDate, startPeriod, endDate, endPeriod) => {
+  if (!startDate || !endDate) return 0;
 
-  const debut = new Date(dateDebut);
-  const fin = new Date(dateFin);
-  const diffTime = fin - debut;
+  const rangeStart = new Date(startDate);
+  const rangeEnd = new Date(endDate);
+  const diffTime = rangeEnd - rangeStart;
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
   let days = diffDays;
 
-  // Ajuster selon les périodes
-  if (dateDebut === dateFin) {
-    // Même jour
-    if (periodeDebut === 'morning' && periodeFin === 'evening') {
+  if (startDate === endDate) {
+    if (startPeriod === 'morning' && endPeriod === 'evening') {
       days = 1;
-    } else if (periodeDebut === 'morning' && periodeFin === 'midday') {
+    } else if (startPeriod === 'morning' && endPeriod === 'midday') {
       days = 0.5;
-    } else if (periodeDebut === 'midday' && periodeFin === 'evening') {
+    } else if (startPeriod === 'midday' && endPeriod === 'evening') {
       days = 0.5;
     } else {
       days = 0.5;
     }
   } else {
-    // Jours différents - compter les jours complets + ajustements
-    if (periodeDebut === 'midday') {
+    if (startPeriod === 'midday') {
       days -= 0.5;
     }
-    if (periodeFin === 'midday') {
+    if (endPeriod === 'midday') {
       days += 0.5;
     } else {
       days += 1;
@@ -126,37 +123,30 @@ const calculateDays = (dateDebut, periodeDebut, dateFin, periodeFin) => {
 };
 
 const CURRENT_WEEK_INFO = getCurrentIsoWeekInfo();
-const PERIODES_DEBUT = [
+const START_PERIOD_OPTIONS = [
   { value: 'morning', label: 'morning' },
   { value: 'midday', label: 'midday' },
 ];
-const PERIODES_FIN = [
+const END_PERIOD_OPTIONS = [
   { value: 'midday', label: 'midday' },
   { value: 'evening', label: 'evening' },
 ];
-const PERIODE_LABELS = {
-  morning: 'Morning',
-  midday: 'Midday',
-  evening: 'Evening',
-  journee: 'Journée',
-  apres_midi: 'Après-midi',
-};
-const PERIODE_ORDER = { morning: 0, midday: 1, evening: 2 };
-const PERIODE_LEGACY_START_MAP = { journee: 'morning', apres_midi: 'midday' };
-const PERIODE_LEGACY_END_MAP = { journee: 'evening', apres_midi: 'midday' };
+const PERIOD_ORDER = { morning: 0, midday: 1, evening: 2 };
+const LEGACY_START_PERIOD_MAP = { journee: 'morning', apres_midi: 'midday' };
+const LEGACY_END_PERIOD_MAP = { journee: 'evening', apres_midi: 'midday' };
 const EXPECTED_WEEK_DAYS = 5;
 
-const normalizePeriodeValue = (value, isStart) => {
-  if (isStart && PERIODE_LEGACY_START_MAP[value]) {
-    return PERIODE_LEGACY_START_MAP[value];
+const normalizePeriodValue = (value, isStart) => {
+  if (isStart && LEGACY_START_PERIOD_MAP[value]) {
+    return LEGACY_START_PERIOD_MAP[value];
   }
-  if (!isStart && PERIODE_LEGACY_END_MAP[value]) {
-    return PERIODE_LEGACY_END_MAP[value];
+  if (!isStart && LEGACY_END_PERIOD_MAP[value]) {
+    return LEGACY_END_PERIOD_MAP[value];
   }
   return value;
 };
 
-const getMotifStyle = (color, pattern) => {
+const getPatternStyle = (color, pattern) => {
   const baseColor = color || '#6c757d';
   if (pattern === 'striped') {
     return {
@@ -182,7 +172,7 @@ const formatDayValue = (value) => {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function TimeEntryGrid({ viewMode = 'table' }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialYear = searchParams.get('year');
   const initialWeek = searchParams.get('week');
@@ -229,6 +219,49 @@ function TimeEntryGrid({ viewMode = 'table' }) {
   const isSynthesisView = viewMode === 'synthesis';
   const [groupedView, setGroupedView] = useState(false);
 
+  const overlapErrorPrefix = 'This time entry overlaps an existing entry for this user';
+  const isOverlapApiError = useCallback((rawError) => (
+    typeof rawError === 'string' && rawError.startsWith(overlapErrorPrefix)
+  ), []);
+
+  const localizeApiError = useCallback((rawError, fallbackKey) => {
+    if (!rawError) {
+      return t(fallbackKey);
+    }
+
+    if (isOverlapApiError(rawError)) {
+      const projectMatch = rawError.match(/\(project:\s*(.+)\)$/i);
+      return t('timeEntry.errorOverlapWithProject', {
+        project: projectMatch?.[1] || t('common.notAvailable'),
+      });
+    }
+
+    return rawError;
+  }, [isOverlapApiError, t]);
+
+  const currentLocale = useMemo(() => {
+    const requestedLocale = i18n.resolvedLanguage || i18n.language;
+    if (!requestedLocale) {
+      return 'en-US';
+    }
+
+    const supportedLocales = Intl.DateTimeFormat.supportedLocalesOf([requestedLocale]);
+    return supportedLocales[0] || 'en-US';
+  }, [i18n.language, i18n.resolvedLanguage]);
+
+  const getPeriodLabel = useCallback((value) => {
+    const keyMap = {
+      morning: 'periods.morning',
+      midday: 'periods.midday',
+      evening: 'periods.evening',
+      journee: 'periods.fullDay',
+      apres_midi: 'periods.afternoon',
+    };
+
+    const key = keyMap[value];
+    return key ? t(key) : value;
+  }, [t]);
+
   useEffect(() => {
     ganttResizeStateRef.current = ganttResizeState;
   }, [ganttResizeState]);
@@ -239,19 +272,19 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       const response = await timeEntryAPI.getAll(filterParams);
       setTimeEntries(response.data);
     } catch (err) {
-      setError('Erreur lors du chargement des timeEntries');
+      setError(t('timeEntry.errorLoad'));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadUsers = useCallback(async () => {
     try {
       const response = await userAPI.getAll();
       setUsers(response.data);
     } catch (err) {
-      console.error('Erreur lors du chargement des users', err);
+      console.error('Error loading users', err);
     }
   }, []);
 
@@ -260,7 +293,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       const response = await projectAPI.getAll();
       setProjects(response.data);
     } catch (err) {
-      console.error('Erreur lors du chargement des projects', err);
+      console.error('Error loading projects', err);
     }
   }, []);
 
@@ -313,13 +346,13 @@ function TimeEntryGrid({ viewMode = 'table' }) {
   );
 
   const handleShowModal = (item = null) => {
-    const normalizePeriodeDebut = (value) => {
+    const normalizeStartPeriod = (value) => {
       if (value === 'journee') return 'morning';
       if (value === 'apres_midi') return 'midday';
       return value === 'midday' ? 'midday' : 'morning';
     };
 
-    const normalizePeriodeFin = (value) => {
+    const normalizeEndPeriod = (value) => {
       if (value === 'journee') return 'evening';
       if (value === 'apres_midi') return 'midday';
       return value === 'midday' ? 'midday' : 'evening';
@@ -327,13 +360,13 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
     if (item) {
       setEditingItem(item);
-      const selectedProjet = projects.find((p) => p.id === item.project_id);
-      setProjectSearchText(selectedProjet ? selectedProjet.name : '');
+      const selectedProject = projects.find((p) => p.id === item.project_id);
+      setProjectSearchText(selectedProject ? selectedProject.name : '');
       setFormData({
         start_date: item.start_date,
-        start_period: normalizePeriodeDebut(item.start_period),
+        start_period: normalizeStartPeriod(item.start_period),
         end_date: item.end_date,
-        end_period: normalizePeriodeFin(item.end_period),
+        end_period: normalizeEndPeriod(item.end_period),
         week_number: item.week_number,
         year: item.year,
         user_id: item.user_id,
@@ -349,7 +382,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
       setFormData({
         start_date: firstAvailable.date,
-        start_period: firstAvailable.periode,
+        start_period: firstAvailable.period,
         end_date: firstAvailable.date,
         end_period: 'evening',
         week_number: selectedWeek,
@@ -395,32 +428,28 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     };
 
     // Vérifier les chevauchements avant la sauvegarde
-    const conflicts = findOverlappingTimeEntries(
-      data.user_id,
-      data.start_date,
-      data.start_period,
-      data.end_date,
-      data.end_period,
-      editingItem?.id
-    );
+    const hasConflict = await openConflictModalForData(data, editingItem);
 
-    if (conflicts.length > 0) {
+    if (hasConflict) {
       // Il y a des conflits, demander confirmation
-      setPendingFormData(data);
-      setPendingEditingItem(editingItem);
-      setConflictingTimeEntries(conflicts);
-      setShowConflictModal(true);
     } else {
       // Pas de conflit, sauvegarder directement
       try {
-        await savePointage(data, editingItem);
+        await saveTimeEntry(data, editingItem);
       } catch (err) {
-        setError(err.response?.data?.error || t('timeEntry.errorSave'));
+        const rawError = err.response?.data?.error;
+        if (isOverlapApiError(rawError)) {
+          const fallbackOpened = await openConflictModalForData(data, editingItem);
+          if (fallbackOpened) {
+            return;
+          }
+        }
+        setError(localizeApiError(rawError, 'timeEntry.errorSave'));
       }
     }
   };
 
-  const savePointage = async (data, editItem) => {
+  const saveTimeEntry = async (data, editItem) => {
     if (editItem) {
       await timeEntryAPI.update(editItem.id, data);
     } else {
@@ -443,7 +472,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       setItemToDelete(null);
       loadTimeEntries(filters);
     } catch (err) {
-      setError(err.response?.data?.error || t('timeEntry.errorDelete'));
+      setError(localizeApiError(err.response?.data?.error, 'timeEntry.errorDelete'));
     }
   };
 
@@ -457,7 +486,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
     return {
       date: dateString,
-      periode: isAfternoon ? 'midday' : 'morning',
+      period: isAfternoon ? 'midday' : 'morning',
     };
   };
 
@@ -472,7 +501,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
       return {
         date: date.toISOString().split('T')[0],
-        periode: isAfternoon ? 'midday' : 'morning',
+        period: isAfternoon ? 'midday' : 'morning',
       };
     }
 
@@ -484,48 +513,102 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
     return {
       date: date.toISOString().split('T')[0],
-      periode: isMiddayBoundary ? 'midday' : 'evening',
+      period: isMiddayBoundary ? 'midday' : 'evening',
     };
   }, [startOfWeekUtc]);
 
-  const findOverlappingTimeEntries = useCallback((utilisateurId, dateDebut, periodeDebut, dateFin, periodeFin, excludeId = null) => {
-    return timeEntries.filter((p) => {
+  const computeOverlappingTimeEntries = useCallback((entries, userId, startDate, startPeriod, endDate, endPeriod, excludeId = null) => {
+    return entries.filter((p) => {
       if (excludeId && p.id === excludeId) return false;
-      if (p.user_id !== utilisateurId) return false;
+      if (p.user_id !== userId) return false;
 
-      const newStart = new Date(dateDebut + 'T00:00:00Z');
-      const newEnd = new Date(dateFin + 'T00:00:00Z');
-      const newStartPeriode = normalizePeriodeValue(periodeDebut, true);
-      const newEndPeriode = normalizePeriodeValue(periodeFin, false);
+      const newStart = new Date(startDate + 'T00:00:00Z');
+      const newEnd = new Date(endDate + 'T00:00:00Z');
+      const newStartPeriod = normalizePeriodValue(startPeriod, true);
+      const newEndPeriod = normalizePeriodValue(endPeriod, false);
 
       const pStart = new Date(p.start_date + 'T00:00:00Z');
       const pEnd = new Date(p.end_date + 'T00:00:00Z');
-      const pStartPeriode = normalizePeriodeValue(p.start_period, true);
-      const pEndPeriode = normalizePeriodeValue(p.end_period, false);
+      const pStartPeriod = normalizePeriodValue(p.start_period, true);
+      const pEndPeriod = normalizePeriodValue(p.end_period, false);
 
       if (newEnd < pStart || newStart > pEnd) return false;
 
       if (newEnd.getTime() === pStart.getTime()) {
-        if (newEndPeriode === 'midday' && pStartPeriode === 'midday') return false;
-        if (newEndPeriode === 'midday' && pStartPeriode === 'morning') return false;
+        if (newEndPeriod === 'midday' && pStartPeriod === 'midday') return false;
+        if (newEndPeriod === 'midday' && pStartPeriod === 'morning') return false;
       }
 
       if (newStart.getTime() === pEnd.getTime()) {
-        if (newStartPeriode === 'midday' && pEndPeriode === 'midday') return false;
+        if (newStartPeriod === 'midday' && pEndPeriod === 'midday') return false;
       }
 
-      if (dateDebut === dateFin && p.start_date === p.end_date && dateDebut === p.start_date) {
-        if (newStartPeriode === 'morning' && newEndPeriode === 'midday' && pStartPeriode === 'midday' && pEndPeriode === 'evening') {
+      if (startDate === endDate && p.start_date === p.end_date && startDate === p.start_date) {
+        if (newStartPeriod === 'morning' && newEndPeriod === 'midday' && pStartPeriod === 'midday' && pEndPeriod === 'evening') {
           return false;
         }
-        if (newStartPeriode === 'midday' && newEndPeriode === 'evening' && pStartPeriode === 'morning' && pEndPeriode === 'midday') {
+        if (newStartPeriod === 'midday' && newEndPeriod === 'evening' && pStartPeriod === 'morning' && pEndPeriod === 'midday') {
           return false;
         }
       }
 
       return true;
     });
-  }, [timeEntries]);
+  }, []);
+
+  const findOverlappingTimeEntries = useCallback((userId, startDate, startPeriod, endDate, endPeriod, excludeId = null) => (
+    computeOverlappingTimeEntries(
+      timeEntries,
+      userId,
+      startDate,
+      startPeriod,
+      endDate,
+      endPeriod,
+      excludeId
+    )
+  ), [computeOverlappingTimeEntries, timeEntries]);
+
+  const openConflictModalForData = useCallback(async (data, editItem = null) => {
+    let conflicts = computeOverlappingTimeEntries(
+      timeEntries,
+      data.user_id,
+      data.start_date,
+      data.start_period,
+      data.end_date,
+      data.end_period,
+      editItem?.id
+    );
+
+    if (conflicts.length === 0) {
+      try {
+        const response = await timeEntryAPI.getAll(filters);
+        const latestEntries = response.data || [];
+        setTimeEntries(latestEntries);
+        conflicts = computeOverlappingTimeEntries(
+          latestEntries,
+          data.user_id,
+          data.start_date,
+          data.start_period,
+          data.end_date,
+          data.end_period,
+          editItem?.id
+        );
+      } catch (refreshErr) {
+        console.error('Error refreshing entries for conflict detection', refreshErr);
+      }
+    }
+
+    if (conflicts.length === 0) {
+      return false;
+    }
+
+    setPendingFormData(data);
+    setPendingEditingItem(editItem);
+    setConflictingTimeEntries(conflicts);
+    setShowConflictModal(true);
+    setError('');
+    return true;
+  }, [computeOverlappingTimeEntries, filters, timeEntries]);
 
   const startGanttResize = (event, bar, edge) => {
     event.preventDefault();
@@ -539,7 +622,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
     const rect = timelineCell.getBoundingClientRect();
     setGanttResizeState({
-      pointageId: bar.id,
+      entryId: bar.id,
       edge,
       startSlot: bar.startSlot,
       endSlot: bar.endSlot,
@@ -560,18 +643,18 @@ function TimeEntryGrid({ viewMode = 'table' }) {
         return;
       }
 
-      const targetPointage = timeEntries.find((item) => item.id === resizeData.pointageId);
-      if (!targetPointage) {
+      const targetTimeEntry = timeEntries.find((item) => item.id === resizeData.entryId);
+      if (!targetTimeEntry) {
         return;
       }
 
       const nextStart = getDateAndPeriodFromBoundary(resizeData.currentStartSlot, true);
       const nextEnd = getDateAndPeriodFromBoundary(resizeData.currentEndSlot, false);
       const hasChanged = (
-        nextStart.date !== targetPointage.start_date
-        || nextStart.periode !== normalizePeriodeValue(targetPointage.start_period, true)
-        || nextEnd.date !== targetPointage.end_date
-        || nextEnd.periode !== normalizePeriodeValue(targetPointage.end_period, false)
+        nextStart.date !== targetTimeEntry.start_date
+        || nextStart.period !== normalizePeriodValue(targetTimeEntry.start_period, true)
+        || nextEnd.date !== targetTimeEntry.end_date
+        || nextEnd.period !== normalizePeriodValue(targetTimeEntry.end_period, false)
       );
 
       if (!hasChanged) {
@@ -579,34 +662,69 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       }
 
       const conflicts = findOverlappingTimeEntries(
-        targetPointage.user_id,
+        targetTimeEntry.user_id,
         nextStart.date,
-        nextStart.periode,
+        nextStart.period,
         nextEnd.date,
-        nextEnd.periode,
-        targetPointage.id
+        nextEnd.period,
+        targetTimeEntry.id
       );
 
       if (conflicts.length > 0) {
-        setError(t('timeEntry.errorResize'));
+        setPendingFormData({
+          start_date: nextStart.date,
+          start_period: nextStart.period,
+          end_date: nextEnd.date,
+          end_period: nextEnd.period,
+          week_number: targetTimeEntry.week_number,
+          year: targetTimeEntry.year,
+          user_id: targetTimeEntry.user_id,
+          project_id: targetTimeEntry.project_id,
+          note: targetTimeEntry.note || '',
+        });
+        setPendingEditingItem(targetTimeEntry);
+        setConflictingTimeEntries(conflicts);
+        setShowConflictModal(true);
         return;
       }
 
       try {
-        await timeEntryAPI.update(targetPointage.id, {
+        const resizedData = {
           start_date: nextStart.date,
-          start_period: nextStart.periode,
+          start_period: nextStart.period,
           end_date: nextEnd.date,
-          end_period: nextEnd.periode,
-          week_number: targetPointage.week_number,
-          year: targetPointage.year,
-          user_id: targetPointage.user_id,
-          project_id: targetPointage.project_id,
-          note: targetPointage.note || '',
-        });
+          end_period: nextEnd.period,
+          week_number: targetTimeEntry.week_number,
+          year: targetTimeEntry.year,
+          user_id: targetTimeEntry.user_id,
+          project_id: targetTimeEntry.project_id,
+          note: targetTimeEntry.note || '',
+        };
+        await timeEntryAPI.update(targetTimeEntry.id, resizedData);
         await loadTimeEntries(filters);
       } catch (err) {
-        setError(err.response?.data?.error || t('timeEntry.errorResize'));
+        const rawError = err.response?.data?.error;
+        if (isOverlapApiError(rawError)) {
+          const resizedData = {
+            start_date: nextStart.date,
+            start_period: nextStart.period,
+            end_date: nextEnd.date,
+            end_period: nextEnd.period,
+            week_number: targetTimeEntry.week_number,
+            year: targetTimeEntry.year,
+            user_id: targetTimeEntry.user_id,
+            project_id: targetTimeEntry.project_id,
+            note: targetTimeEntry.note || '',
+          };
+          const fallbackOpened = await openConflictModalForData(
+            resizedData,
+            targetTimeEntry
+          );
+          if (fallbackOpened) {
+            return;
+          }
+        }
+        setError(localizeApiError(rawError, 'timeEntry.errorResize'));
       }
     };
 
@@ -650,26 +768,25 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [filters, findOverlappingTimeEntries, ganttResizeState, getDateAndPeriodFromBoundary, loadTimeEntries, t, timeEntries]);
+  }, [filters, findOverlappingTimeEntries, ganttResizeState, getDateAndPeriodFromBoundary, isOverlapApiError, loadTimeEntries, localizeApiError, openConflictModalForData, timeEntries]);
 
-  const handleSlotClick = (utilisateurId, projetId, slotIndex) => {
+  const handleSlotClick = (userId, projectId, slotIndex) => {
     const slotData = getDateAndPeriodFromSlot(slotIndex);
 
-    // Ouvrir directement la modale de création sans vérification
     openSlotCreation({
-      user_id: utilisateurId,
-      project_id: projetId,
+      user_id: userId,
+      project_id: projectId,
       start_date: slotData.date,
-      start_period: slotData.periode,
+      start_period: slotData.period,
       end_date: slotData.date,
-      end_period: slotData.periode === 'morning' ? 'midday' : 'evening',
+      end_period: slotData.period === 'morning' ? 'midday' : 'evening',
     });
   };
 
   const openSlotCreation = (slotData) => {
     setEditingItem(null);
-    const selectedProjet = projects.find((p) => p.id === slotData.project_id);
-    setProjectSearchText(selectedProjet ? selectedProjet.name : '');
+    const selectedProject = projects.find((p) => p.id === slotData.project_id);
+    setProjectSearchText(selectedProject ? selectedProject.name : '');
     setFormData({
       start_date: slotData.start_date,
       start_period: slotData.start_period,
@@ -688,27 +805,24 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     if (!pendingFormData) return;
 
     try {
-      // Supprimer les timeEntries en conflit
-      for (const conflict of conflictingTimeEntries) {
-        await timeEntryAPI.delete(conflict.id);
-      }
+      await saveTimeEntry(
+        { ...pendingFormData, overwrite_conflicts: true },
+        pendingEditingItem
+      );
 
-      // Recharger pour avoir les données à jour
-      await loadTimeEntries(filters);
-
-      // Sauvegarder le nouveau pointage
-      await savePointage(pendingFormData, pendingEditingItem);
-
-      // Nettoyer l'état seulement si tout s'est bien passé
+      // Clear conflict state only if everything succeeded.
       setShowConflictModal(false);
       setConflictingTimeEntries([]);
       setPendingFormData(null);
       setPendingEditingItem(null);
     } catch (err) {
-      console.error('Erreur lors de la résolution des conflits:', err);
-      const errorMsg = err.response?.data?.error || err.message || 'Erreur lors de la suppression des conflits';
+      console.error('Error resolving conflicts:', err);
+      const errorMsg = localizeApiError(
+        err.response?.data?.error || err.message,
+        'timeEntry.errorResolveConflicts'
+      );
       setError(errorMsg);
-      // Ne pas fermer la modale pour que l'utilisateur voie l'erreur et puisse réessayer
+      // Keep the modal open so the user can retry.
     }
   };
 
@@ -749,73 +863,71 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     });
   };
 
-  const handleDateDebutChange = (value) => {
+  const handleStartDateChange = (value) => {
     setFormData((prev) => {
       const next = { ...prev, start_date: value };
       if (next.end_date && next.end_date < next.start_date) {
         next.end_date = next.start_date;
         next.end_period = 'evening';
       }
-      if (next.start_date === next.end_date && PERIODE_ORDER[next.end_period] <= PERIODE_ORDER[next.start_period]) {
+      if (next.start_date === next.end_date && PERIOD_ORDER[next.end_period] <= PERIOD_ORDER[next.start_period]) {
         next.end_period = 'evening';
       }
       return next;
     });
   };
 
-  const handleDateFinChange = (value) => {
+  const handleEndDateChange = (value) => {
     setFormData((prev) => {
       const next = { ...prev, end_date: value };
-      if (next.start_date === next.end_date && PERIODE_ORDER[next.end_period] <= PERIODE_ORDER[next.start_period]) {
+      if (next.start_date === next.end_date && PERIOD_ORDER[next.end_period] <= PERIOD_ORDER[next.start_period]) {
         next.end_period = next.start_period === 'midday' ? 'evening' : 'midday';
       }
       return next;
     });
   };
 
-  const handlePeriodeDebutChange = (value) => {
+  const handleStartPeriodChange = (value) => {
     setFormData((prev) => {
       const next = { ...prev, start_period: value };
       if (next.end_date && next.end_date < next.start_date) {
         next.end_date = next.start_date;
         next.end_period = 'evening';
       }
-      if (next.start_date === next.end_date && PERIODE_ORDER[next.end_period] <= PERIODE_ORDER[value]) {
+      if (next.start_date === next.end_date && PERIOD_ORDER[next.end_period] <= PERIOD_ORDER[value]) {
         next.end_period = 'evening';
       }
       return next;
     });
   };
 
-  const handlePeriodeFinChange = (value) => {
+  const handleEndPeriodChange = (value) => {
     setFormData((prev) => ({ ...prev, end_period: value }));
   };
 
-  const findFirstAvailableSlot = (utilisateurId, weekYear, weekNumber) => {
-    if (!utilisateurId) {
+  const findFirstAvailableSlot = (userId, weekYear, weekNumber) => {
+    if (!userId) {
       const dateRange = getIsoWeekDateRange(weekYear, weekNumber);
-      return { date: dateRange.start_date, periode: 'morning' };
+      return { date: dateRange.start_date, period: 'morning' };
     }
 
-    // Get all timeEntries for this user in the selected week
-    const userPointages = timeEntries.filter(
-      (p) => p.user_id === parseInt(utilisateurId) &&
+    const userEntries = timeEntries.filter(
+      (p) => p.user_id === parseInt(userId) &&
              p.year === weekYear &&
              p.week_number === weekNumber
     );
 
-    if (userPointages.length === 0) {
+    if (userEntries.length === 0) {
       const dateRange = getIsoWeekDateRange(weekYear, weekNumber);
-      return { date: dateRange.start_date, periode: 'morning' };
+      return { date: dateRange.start_date, period: 'morning' };
     }
 
-    // Build a map of occupied slots
     const occupiedSlots = new Set();
-    userPointages.forEach((p) => {
+    userEntries.forEach((p) => {
       const start = new Date(p.start_date + 'T00:00:00Z');
       const end = new Date(p.end_date + 'T00:00:00Z');
-      const startPeriode = normalizePeriodeValue(p.start_period, true);
-      const endPeriode = normalizePeriodeValue(p.end_period, false);
+      const startPeriod = normalizePeriodValue(p.start_period, true);
+      const endPeriod = normalizePeriodValue(p.end_period, false);
 
       const daysCount = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
       for (let i = 0; i < daysCount; i++) {
@@ -825,28 +937,26 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
         if (dateStr === p.start_date && dateStr === p.end_date) {
           // Same day
-          if (startPeriode === 'morning' && endPeriode === 'evening') {
+          if (startPeriod === 'morning' && endPeriod === 'evening') {
             occupiedSlots.add(`${dateStr}-morning`);
             occupiedSlots.add(`${dateStr}-midday`);
-          } else if (startPeriode === 'morning' && endPeriode === 'midday') {
+          } else if (startPeriod === 'morning' && endPeriod === 'midday') {
             occupiedSlots.add(`${dateStr}-morning`);
-          } else if (startPeriode === 'midday' && endPeriode === 'evening') {
+          } else if (startPeriod === 'midday' && endPeriod === 'evening') {
             occupiedSlots.add(`${dateStr}-midday`);
           } else {
             occupiedSlots.add(`${dateStr}-morning`);
             occupiedSlots.add(`${dateStr}-midday`);
           }
         } else if (dateStr === p.start_date) {
-          // First day
-          if (startPeriode === 'morning') {
+          if (startPeriod === 'morning') {
             occupiedSlots.add(`${dateStr}-morning`);
             occupiedSlots.add(`${dateStr}-midday`);
           } else {
             occupiedSlots.add(`${dateStr}-midday`);
           }
         } else if (dateStr === p.end_date) {
-          // Last day
-          if (endPeriode === 'evening') {
+          if (endPeriod === 'evening') {
             occupiedSlots.add(`${dateStr}-morning`);
             occupiedSlots.add(`${dateStr}-midday`);
           } else {
@@ -872,15 +982,14 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       const dateStr = d.toISOString().split('T')[0];
 
       if (!occupiedSlots.has(`${dateStr}-morning`)) {
-        return { date: dateStr, periode: 'morning' };
+        return { date: dateStr, period: 'morning' };
       }
       if (!occupiedSlots.has(`${dateStr}-midday`)) {
-        return { date: dateStr, periode: 'midday' };
+        return { date: dateStr, period: 'midday' };
       }
     }
 
-    // If no slot available, return first date
-    return { date: dateRange.start_date, periode: 'morning' };
+    return { date: dateRange.start_date, period: 'morning' };
   };
 
   const handleSort = (column) => {
@@ -912,16 +1021,16 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           bVal = b.start_date || '';
           break;
         case 'start_period':
-          aVal = PERIODE_ORDER[a.start_period] || 0;
-          bVal = PERIODE_ORDER[b.start_period] || 0;
+          aVal = PERIOD_ORDER[a.start_period] || 0;
+          bVal = PERIOD_ORDER[b.start_period] || 0;
           break;
         case 'end_date':
           aVal = a.end_date || '';
           bVal = b.end_date || '';
           break;
         case 'end_period':
-          aVal = PERIODE_ORDER[a.end_period] || 0;
-          bVal = PERIODE_ORDER[b.end_period] || 0;
+          aVal = PERIOD_ORDER[a.end_period] || 0;
+          bVal = PERIOD_ORDER[b.end_period] || 0;
           break;
         case 'days':
           aVal = calculateDays(a.start_date, a.start_period, a.end_date, a.end_period);
@@ -942,7 +1051,12 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     return sortDirection === 'asc' ? <i className="fas fa-sort-up ms-1"></i> : <i className="fas fa-sort-down ms-1"></i>;
   };
 
-  const selectedWeekLabel = `Lundi ${formatFrenchShortDate(selectedWeekRange.monday)} - Vendredi ${formatFrenchShortDate(selectedWeekRange.friday)}`;
+  const selectedWeekLabel = t('grid.selectedWeekLabel', {
+    startDay: t('days.monday'),
+    startDate: formatShortDate(selectedWeekRange.monday, currentLocale),
+    endDay: t('days.friday'),
+    endDate: formatShortDate(selectedWeekRange.friday, currentLocale),
+  });
   const weekQueryString = `?year=${filters.year}&week=${filters.week_number}`;
   const sortedTimeEntries = getSortedTimeEntries();
 
@@ -957,19 +1071,19 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           key,
           user: item.user,
           project: item.project,
-          totalJours: 0,
+          totalDays: 0,
         };
       }
-      map[key].totalJours += calculateDays(item.start_date, item.start_period, item.end_date, item.end_period);
+      map[key].totalDays += calculateDays(item.start_date, item.start_period, item.end_date, item.end_period);
     });
     return Object.values(map).sort((a, b) => {
-      const nomA = a.user?.name || '';
-      const nomB = b.user?.name || '';
-      const cmp = nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' });
+      const userNameA = a.user?.name || '';
+      const userNameB = b.user?.name || '';
+      const cmp = userNameA.localeCompare(userNameB, currentLocale, { sensitivity: 'base' });
       if (cmp !== 0) return cmp;
-      return (a.project?.name || '').localeCompare(b.project?.name || '', 'en', { sensitivity: 'base' });
+      return (a.project?.name || '').localeCompare(b.project?.name || '', currentLocale, { sensitivity: 'base' });
     });
-  }, [timeEntries]);
+  }, [currentLocale, timeEntries]);
 
   const userMissingDaysMap = useMemo(() => {
     const pointedDaysByUser = timeEntries.reduce((acc, item) => {
@@ -997,10 +1111,10 @@ function TimeEntryGrid({ viewMode = 'table' }) {
         color: user.color || '#ccc',
         missingDays: userMissingDaysMap[user.id] ?? EXPECTED_WEEK_DAYS,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
-  }, [users, userMissingDaysMap]);
+        .sort((a, b) => a.name.localeCompare(b.name, currentLocale, { sensitivity: 'base' }));
+      }, [currentLocale, users, userMissingDaysMap]);
 
-  const syntheseData = useMemo(() => {
+  const synthesisData = useMemo(() => {
     const usersMap = {};
     const projectsMap = {};
     const cellData = {};
@@ -1013,25 +1127,25 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       projectsMap[projectId] = row.project;
 
       if (!cellData[projectId]) cellData[projectId] = {};
-      cellData[projectId][userId] = (cellData[projectId][userId] || 0) + row.totalJours;
+      cellData[projectId][userId] = (cellData[projectId][userId] || 0) + row.totalDays;
     });
 
     const users = Object.values(usersMap).sort((a, b) =>
-      (a?.name || '').localeCompare(b?.name || '', 'en', { sensitivity: 'base' })
+      (a?.name || '').localeCompare(b?.name || '', currentLocale, { sensitivity: 'base' })
     );
     const projects = Object.values(projectsMap).sort((a, b) =>
-      (a?.name || '').localeCompare(b?.name || '', 'en', { sensitivity: 'base' })
+      (a?.name || '').localeCompare(b?.name || '', currentLocale, { sensitivity: 'base' })
     );
 
     return { users, projects, cellData };
-  }, [groupedTimeEntries]);
+  }, [currentLocale, groupedTimeEntries]);
 
   const ganttDays = Array.from({ length: 5 }, (_, index) => {
     const date = new Date(selectedWeekRange.monday);
     date.setUTCDate(selectedWeekRange.monday.getUTCDate() + index);
     return {
-      label: new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(date),
-      shortDate: new Intl.DateTimeFormat('en-US', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(date),
+      label: new Intl.DateTimeFormat(currentLocale, { weekday: 'short', timeZone: 'UTC' }).format(date),
+      shortDate: new Intl.DateTimeFormat(currentLocale, { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(date),
     };
   });
 
@@ -1050,7 +1164,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     const dateUtc = new Date(`${dateString}T00:00:00Z`);
     const dayDiff = Math.floor((dateUtc - startOfWeekUtc) / (1000 * 60 * 60 * 24));
     const clampedDay = Math.min(4, Math.max(0, dayDiff));
-    const normalizedPeriod = normalizePeriodeValue(period, !isEnd);
+    const normalizedPeriod = normalizePeriodValue(period, !isEnd);
 
     if (isEnd) {
       const endOffset = normalizedPeriod === 'midday' ? 1 : 2;
@@ -1065,26 +1179,26 @@ function TimeEntryGrid({ viewMode = 'table' }) {
   const ganttGroupMap = new Map();
   const ganttRowsGrouped = [];
   const ganttSortedItems = [...ganttVisibleTimeEntries].sort((a, b) => {
-    const userCmp = (a.user?.name || '').localeCompare(b.user?.name || '', 'fr', { sensitivity: 'base' });
+    const userCmp = (a.user?.name || '').localeCompare(b.user?.name || '', currentLocale, { sensitivity: 'base' });
     if (userCmp !== 0) return userCmp;
-    return (a.project?.name || '').localeCompare(b.project?.name || '', 'en', { sensitivity: 'base' });
+    return (a.project?.name || '').localeCompare(b.project?.name || '', currentLocale, { sensitivity: 'base' });
   });
 
   for (const item of ganttSortedItems) {
     const userId = item.user?.id ?? null;
-    const projetId = item.project?.id ?? null;
-    const key = `${userId}_${projetId}`;
+    const projectId = item.project?.id ?? null;
+    const key = `${userId}_${projectId}`;
 
     if (!ganttGroupMap.has(key)) {
       const row = {
         key,
         userId,
-        userNom: item.user?.name || 'N/A',
-        userCouleur: item.user?.color || '#ccc',
-        projectId: projetId,
-        projectNom: item.project?.name || 'N/A',
-        projectCouleur: item.project?.color || '#6c757d',
-        projectMotif: item.project?.pattern || 'solid',
+        userName: item.user?.name || 'N/A',
+        userColor: item.user?.color || '#ccc',
+        projectId,
+        projectName: item.project?.name || 'N/A',
+        projectColor: item.project?.color || '#6c757d',
+        projectPattern: item.project?.pattern || 'solid',
         bars: [],
       };
       ganttGroupMap.set(key, row);
@@ -1100,7 +1214,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
     row.bars.push({
       id: item.id,
-      pointage: item,
+      timeEntry: item,
       startSlot: clampedStart,
       endSlot: clampedEnd,
       leftPercent: (clampedStart / 10) * 100,
@@ -1110,7 +1224,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
   const ganttRows = ganttRowsGrouped;
 
-  const isSameUtilisateurRow = (currentRow, previousRow) => {
+  const isSameUserRow = (currentRow, previousRow) => {
     if (!currentRow || !previousRow) {
       return false;
     }
@@ -1119,22 +1233,22 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       return currentRow.userId === previousRow.userId;
     }
 
-    return currentRow.userNom === previousRow.userNom;
+    return currentRow.userName === previousRow.userName;
   };
 
-  let utilisateurGroupIndex = -1;
+  let userGroupIndex = -1;
   const ganttRowsWithDisplayState = ganttRows.map((row, index) => {
     const previousRow = index > 0 ? ganttRows[index - 1] : null;
-    const hasSameUtilisateurAsPrevious = isSameUtilisateurRow(row, previousRow);
+    const hasSameUserAsPrevious = isSameUserRow(row, previousRow);
 
-    if (!hasSameUtilisateurAsPrevious) {
-      utilisateurGroupIndex += 1;
+    if (!hasSameUserAsPrevious) {
+      userGroupIndex += 1;
     }
 
     return {
       ...row,
-      isNewUtilisateurGroup: index > 0 && !hasSameUtilisateurAsPrevious,
-      isAltUserPairBackground: utilisateurGroupIndex % 2 === 0,
+      isNewUserGroup: index > 0 && !hasSameUserAsPrevious,
+      isAltUserPairBackground: userGroupIndex % 2 === 0,
     };
   });
 
@@ -1210,9 +1324,9 @@ function TimeEntryGrid({ viewMode = 'table' }) {
         week_number: filters.week_number,
       });
       downloadBlob(response.data, `time_entries_${filters.year}_W${filters.week_number}.csv`);
-      setMessage('Export CSV des timeEntries terminé pour la semaine filtrée.');
+      setMessage(t('timeEntry.exportCsvSuccess'));
     } catch (err) {
-      setError(err.response?.data?.error || t('timeEntry.errorExportCsv'));
+      setError(localizeApiError(err.response?.data?.error, 'timeEntry.errorExportCsv'));
     }
   };
 
@@ -1230,11 +1344,14 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       const response = await timeEntryAPI.importCSV(file);
       const data = response.data || {};
       setMessage(
-        `Import CSV timeEntries : ${data.created || 0} créé(s), ${(data.errors || []).length} erreur(s).`
+        t('timeEntry.importSummary', {
+          created: data.created || 0,
+          errors: (data.errors || []).length,
+        })
       );
       await loadTimeEntries(filters);
     } catch (err) {
-      setError(err.response?.data?.error || t('timeEntry.errorImportCsv'));
+      setError(localizeApiError(err.response?.data?.error, 'timeEntry.errorImportCsv'));
     } finally {
       e.target.value = '';
     }
@@ -1256,7 +1373,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
             <i className="fas fa-file-export me-2"></i>
             {t('timeEntry.exportCsv')}
           </Button>
-          <Button variant="outline-secondary" size="sm" as="a" href="/examples/pointages_exemple.csv" download className="d-inline-flex align-items-center">
+          <Button variant="outline-secondary" size="sm" as="a" href="/examples/time_entries_example.csv" download className="d-inline-flex align-items-center">
             <i className="fas fa-download me-2"></i>
             {t('grid.csvExample') || 'CSV example'}
           </Button>
@@ -1407,7 +1524,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           {isGanttView && (
           <div className="gantt-view mb-3">
             <div className="gantt-header">
-              <div className="gantt-resource-head">Ressource</div>
+              <div className="gantt-resource-head">{t('grid.resource')}</div>
               <div className="gantt-timeline-head">
                 {ganttDays.map((day, dayIndex) => (
                   <div key={`${day.shortDate}-${dayIndex}`} className="gantt-day-head">
@@ -1425,15 +1542,15 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                 return (
                   <div
                     key={row.key}
-                    className={`gantt-row ${row.isNewUtilisateurGroup ? 'gantt-row-user-separator' : ''} ${row.isAltUserPairBackground ? 'gantt-row-user-pair-alt' : ''}`.trim()}
+                    className={`gantt-row ${row.isNewUserGroup ? 'gantt-row-user-separator' : ''} ${row.isAltUserPairBackground ? 'gantt-row-user-pair-alt' : ''}`.trim()}
                   >
                   <div className="gantt-resource-cell">
                     <div
                       className="gantt-user-color"
-                      style={{ backgroundColor: row.userCouleur }}
+                      style={{ backgroundColor: row.userColor }}
                     />
-                    <span className="gantt-user-name">{row.userNom}</span>
-                    <span className="gantt-project-name">· {row.projectNom}</span>
+                    <span className="gantt-user-name">{row.userName}</span>
+                    <span className="gantt-project-name">· {row.projectName}</span>
                   </div>
                   <div className="gantt-timeline-cell">
                     <div className="gantt-slot-grid">
@@ -1452,7 +1569,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                       ))}
                     </div>
                     {row.bars.map((bar) => {
-                      const isResizingBar = ganttResizeState?.pointageId === bar.id;
+                      const isResizingBar = ganttResizeState?.entryId === bar.id;
                       const previewStart = isResizingBar ? ganttResizeState.currentStartSlot : bar.startSlot;
                       const previewEnd = isResizingBar ? ganttResizeState.currentEndSlot : bar.endSlot;
                       const previewSpan = previewEnd - previewStart;
@@ -1464,21 +1581,21 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                           style={{
                             left: `${(previewStart / 10) * 100}%`,
                             width: `${(previewSpan / 10) * 100}%`,
-                            ...getMotifStyle(row.projectCouleur, row.projectMotif),
+                            ...getPatternStyle(row.projectColor, row.projectPattern),
                           }}
-                          title={`${row.userNom} · ${row.projectNom}${bar.pointage.note ? ` · 📝 ${bar.pointage.note}` : ''} · ${t('grid.ganttLeftClick')} · ${t('grid.ganttRightClick')} · ${t('grid.ganttResize')}`}
+                          title={`${row.userName} · ${row.projectName}${bar.timeEntry.note ? ` · 📝 ${bar.timeEntry.note}` : ''} · ${t('grid.ganttLeftClick')} · ${t('grid.ganttRightClick')} · ${t('grid.ganttResize')}`}
                           onClick={() => {
                             if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
                               return;
                             }
-                            handleShowModal(bar.pointage);
+                            handleShowModal(bar.timeEntry);
                           }}
                           onContextMenu={(event) => {
                             event.preventDefault();
                             if (ganttResizeState || Date.now() < suppressGanttClickUntilRef.current) {
                               return;
                             }
-                            handleDeleteClick(bar.pointage);
+                            handleDeleteClick(bar.timeEntry);
                           }}
                         >
                           <div
@@ -1506,7 +1623,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 
           {isSynthesisView && (
             <div>
-              {syntheseData.projects.length === 0 ? (
+              {synthesisData.projects.length === 0 ? (
 <p className="text-center text-muted py-4">{t('common.noData')}</p>
               ) : (
                 <div className="table-responsive">
@@ -1515,7 +1632,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                       <tr>
                         <th>{t('timeEntry.project')}</th>
                         <th>{t('project.trackingCode')}</th>
-                        {syntheseData.users.map((u) => (
+                        {synthesisData.users.map((u) => (
                           <th key={u?.id} className="text-center">
                             <div className="d-flex align-items-center justify-content-center gap-1">
                               <span
@@ -1536,11 +1653,11 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {syntheseData.projects.map((project) => {
+                      {synthesisData.projects.map((project) => {
                         const projectId = project?.id ?? 'unknown';
-                        const rowCells = syntheseData.users.map((u) => {
+                        const rowCells = synthesisData.users.map((u) => {
                           const userId = u?.id ?? 'unknown';
-                          return syntheseData.cellData[projectId]?.[userId] || 0;
+                          return synthesisData.cellData[projectId]?.[userId] || 0;
                         });
                         const rowTotal = rowCells.reduce((s, v) => s + v, 0);
                         return (
@@ -1554,7 +1671,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                                     borderRadius: 3,
                                     border: '1px solid #999',
                                     flexShrink: 0,
-                                    ...getMotifStyle(project?.color || '#ccc', project?.pattern || 'solid'),
+                                    ...getPatternStyle(project?.color || '#ccc', project?.pattern || 'solid'),
                                   }}
                                 />
                                 {project?.name || 'N/A'}
@@ -1578,11 +1695,11 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                     <tfoot>
                       <tr className="fw-bold">
                         <td colSpan={2}>{t('grid.total') || 'Total'}</td>
-                        {syntheseData.users.map((u) => {
+                        {synthesisData.users.map((u) => {
                           const userId = u?.id ?? 'unknown';
-                          const colTotal = syntheseData.projects.reduce((s, proj) => {
+                          const colTotal = synthesisData.projects.reduce((s, proj) => {
                             const pid = proj?.id ?? 'unknown';
-                            return s + (syntheseData.cellData[pid]?.[userId] || 0);
+                            return s + (synthesisData.cellData[pid]?.[userId] || 0);
                           }, 0);
                           return (
                             <td key={userId} className="text-center" style={{ fontFamily: 'monospace' }}>
@@ -1592,11 +1709,11 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                         })}
                         <td className="text-center" style={{ fontFamily: 'monospace' }}>
                           {formatDayValue(
-                            syntheseData.projects.reduce((s, proj) => {
+                            synthesisData.projects.reduce((s, proj) => {
                               const pid = proj?.id ?? 'unknown';
-                              return s + syntheseData.users.reduce((ss, u) => {
+                              return s + synthesisData.users.reduce((ss, u) => {
                                 const userId = u?.id ?? 'unknown';
-                                return ss + (syntheseData.cellData[pid]?.[userId] || 0);
+                                return ss + (synthesisData.cellData[pid]?.[userId] || 0);
                               }, 0);
                             }, 0)
                           )}
@@ -1646,7 +1763,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                           borderRadius: '3px',
                           border: '1px solid #999',
                           flexShrink: 0,
-                          ...getMotifStyle(row.project?.color || '#ccc', row.project?.pattern || 'solid'),
+                          ...getPatternStyle(row.project?.color || '#ccc', row.project?.pattern || 'solid'),
                         }}
                         title={`${row.project?.color || '#ccc'} · ${row.project?.pattern || 'solid'}`}
                       />
@@ -1657,7 +1774,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                     {row.project?.tracking_code?.code || ''}
                   </td>
                   <td className="text-center" style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                    {formatDayValue(row.totalJours)}
+                    {formatDayValue(row.totalDays)}
                   </td>
                 </tr>
               ))}
@@ -1722,7 +1839,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                         borderRadius: '3px',
                         border: '1px solid #999',
                         flexShrink: 0,
-                        ...getMotifStyle(item.project?.color || '#ccc', item.project?.pattern || 'solid'),
+                        ...getPatternStyle(item.project?.color || '#ccc', item.project?.pattern || 'solid'),
                       }}
                       title={`${item.project?.color || '#ccc'} · ${item.project?.pattern || 'solid'}`}
                     />
@@ -1739,14 +1856,14 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                   {formatDateDDMMYYYY(item.start_date)}
                   {' '}
                   <span style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
-                    ({PERIODE_LABELS[item.start_period] || item.start_period})
+                    ({getPeriodLabel(item.start_period)})
                   </span>
                 </td>
                 <td className="text-center" style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}>
                   {formatDateDDMMYYYY(item.end_date)}
                   {' '}
                   <span style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
-                    ({PERIODE_LABELS[item.end_period] || item.end_period})
+                    ({getPeriodLabel(item.end_period)})
                   </span>
                 </td>
                 <td>
@@ -1766,7 +1883,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                     <Button
                       variant="outline-warning"
                       size="sm"
-                      title="Modifier"
+                      title={t('common.edit')}
                       onClick={() => handleShowModal(item)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -1776,7 +1893,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                     <Button
                       variant="outline-danger"
                       size="sm"
-                      title="Supprimer"
+                      title={t('common.delete')}
                       onClick={() => handleDeleteClick(item)}
                       className="d-flex align-items-center justify-content-center"
                       style={{ width: '36px', height: '36px', padding: '0' }}
@@ -1825,7 +1942,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                       ...prev,
                       user_id: newUserId,
                       start_date: firstAvailable.date,
-                      start_period: firstAvailable.periode,
+                      start_period: firstAvailable.period,
                       end_date: firstAvailable.date,
                       end_period: 'evening',
                     }));
@@ -1847,10 +1964,10 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                 options={projectOptions}
                 value={projectOptions.find(opt => opt.value === parseInt(formData.project_id)) || null}
                 onChange={(selectedOption) => {
-                  const newProjetId = selectedOption ? selectedOption.value : '';
-                  const newProjetNom = selectedOption ? selectedOption.label : '';
-                  setFormData({ ...formData, project_id: newProjetId });
-                  setProjectSearchText(newProjetNom);
+                  const newProjectId = selectedOption ? selectedOption.value : '';
+                  const newProjectName = selectedOption ? selectedOption.label : '';
+                  setFormData({ ...formData, project_id: newProjectId });
+                  setProjectSearchText(newProjectName);
                 }}
                 onInputChange={(inputValue) => {
                   setProjectSearchText(inputValue);
@@ -1868,29 +1985,29 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                 {t('timeEntry.startDate')}
                 {formData.start_date && (
                   <span style={{ fontStyle: 'italic', marginLeft: '8px', color: '#6c757d' }}>
-                    ({getDayName(formData.start_date)})
+                    ({getDayName(formData.start_date, currentLocale)})
                   </span>
                 )}
               </Form.Label>
               <Form.Control
                 type="date"
-                lang="fr-FR"
+                lang={currentLocale}
                 value={formData.start_date}
-                onChange={(e) => handleDateDebutChange(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 required
               />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('timeEntry.startPeriod')}</Form.Label>
               <div className="period-switch" role="radiogroup" aria-label="Période de début">
-                {PERIODES_DEBUT.map((periode) => (
+                {START_PERIOD_OPTIONS.map((periodOption) => (
                   <button
-                    key={periode.value}
+                    key={periodOption.value}
                     type="button"
-                    className={`period-switch-option ${formData.start_period === periode.value ? 'active' : ''}`}
-                    onClick={() => handlePeriodeDebutChange(periode.value)}
+                    className={`period-switch-option ${formData.start_period === periodOption.value ? 'active' : ''}`}
+                    onClick={() => handleStartPeriodChange(periodOption.value)}
                   >
-                    {t(`periods.${periode.value}`)}
+                    {t(`periods.${periodOption.value}`)}
                   </button>
                 ))}
               </div>
@@ -1900,33 +2017,33 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                 {t('timeEntry.endDate')}
                 {formData.end_date && (
                   <span style={{ fontStyle: 'italic', marginLeft: '8px', color: '#6c757d' }}>
-                    ({getDayName(formData.end_date)})
+                    ({getDayName(formData.end_date, currentLocale)})
                   </span>
                 )}
               </Form.Label>
               <Form.Control
                 type="date"
-                lang="fr-FR"
+                lang={currentLocale}
                 value={formData.end_date}
-                onChange={(e) => handleDateFinChange(e.target.value)}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 required
               />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('timeEntry.endPeriod')}</Form.Label>
               <div className="period-switch" role="radiogroup" aria-label="Période de fin">
-                {PERIODES_FIN.map((periode) => {
+                {END_PERIOD_OPTIONS.map((periodOption) => {
                   const isDisabled = formData.start_date === formData.end_date
-                    && PERIODE_ORDER[periode.value] <= PERIODE_ORDER[formData.start_period];
+                    && PERIOD_ORDER[periodOption.value] <= PERIOD_ORDER[formData.start_period];
                   return (
                     <button
-                      key={periode.value}
+                      key={periodOption.value}
                       type="button"
-                      className={`period-switch-option ${formData.end_period === periode.value ? 'active' : ''}`}
-                      onClick={() => !isDisabled && handlePeriodeFinChange(periode.value)}
+                      className={`period-switch-option ${formData.end_period === periodOption.value ? 'active' : ''}`}
+                      onClick={() => !isDisabled && handleEndPeriodChange(periodOption.value)}
                       disabled={isDisabled}
                     >
-                      {t(`periods.${periode.value}`)}
+                      {t(`periods.${periodOption.value}`)}
                     </button>
                   );
                 })}
@@ -1980,22 +2097,22 @@ function TimeEntryGrid({ viewMode = 'table' }) {
                   <strong>{t('timeEntry.project')}:</strong> {itemToDelete.project?.name || 'N/A'}
                 </div>
                 <div>
-                  <strong>{t('timeEntry.period') || 'Period'}:</strong> {formatDateDDMMYYYY(itemToDelete.start_date)} au {formatDateDDMMYYYY(itemToDelete.end_date)}
+                  <strong>{t('timeEntry.period')}:</strong> {formatDateDDMMYYYY(itemToDelete.start_date)} {t('common.to')} {formatDateDDMMYYYY(itemToDelete.end_date)}
                 </div>
               </div>
               <div className="alert alert-warning mb-0" role="alert">
-                ⚠️ Cette action ne peut pas être annulée.
+                {t('timeEntry.deleteIrreversible')}
               </div>
             </div>
           )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Annuler
+            {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={handleConfirmDelete}>
             <i className="fas fa-trash me-2" style={{ color: 'white' }}></i>
-            Supprimer
+            {t('common.delete')}
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2011,32 +2128,32 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
           <div>
             <p className="mb-3">
-              La période sélectionnée chevauche {conflictingTimeEntries.length} pointage(s) existant(s).
+              {t('grid.conflictDescription', { count: conflictingTimeEntries.length })}
             </p>
             <div className="alert alert-warning mb-3" role="alert">
-              <strong>Pointages en conflit :</strong>
+              <strong>{t('grid.conflictEntriesTitle')}</strong>
               <ul className="mb-0 mt-2">
                 {conflictingTimeEntries.map((conflict) => (
                   <li key={conflict.id}>
-                    <strong>{conflict.project?.name || 'N/A'}</strong> -
-                    {' '}{formatDateDDMMYYYY(conflict.start_date)} ({PERIODE_LABELS[conflict.start_period] || conflict.start_period})
-                    {' '}au {formatDateDDMMYYYY(conflict.end_date)} ({PERIODE_LABELS[conflict.end_period] || conflict.end_period})
+                    <strong>{conflict.project?.name || t('common.notAvailable')}</strong> -
+                    {' '}{formatDateDDMMYYYY(conflict.start_date)} ({getPeriodLabel(conflict.start_period)})
+                    {' '}{t('common.to')} {formatDateDDMMYYYY(conflict.end_date)} ({getPeriodLabel(conflict.end_period)})
                   </li>
                 ))}
               </ul>
             </div>
             <div className="alert alert-danger mb-0" role="alert">
-              ⚠️ En confirmant, ces timeEntries seront supprimés définitivement avant d'enregistrer le nouveau.
+              {t('grid.conflictWarning')}
             </div>
           </div>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCancelConflict}>
-            Annuler
+            {t('common.cancel')}
           </Button>
           <Button variant="warning" onClick={handleConfirmConflictAndCreate}>
             <i className="fas fa-check me-2"></i>
-            Confirmer et enregistrer
+            {t('grid.confirmAndSave')}
           </Button>
         </Modal.Footer>
       </Modal>

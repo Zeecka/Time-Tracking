@@ -6,7 +6,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from app.extensions import db
 from app.models import Project, TimeEntry, User
-from app.schemas import time_entry_schema, time_entries_schema
+from app.schemas import time_entries_schema, time_entry_schema
 
 time_entry_bp = Blueprint("time_entry", __name__)
 
@@ -49,9 +49,7 @@ def _normalize_and_validate_period(value, field_name, is_start):
     return period
 
 
-def _validate_entry_dates_and_periods(
-    start_date, end_date, start_period, end_period
-):
+def _validate_entry_dates_and_periods(start_date, end_date, start_period, end_period):
     if end_date < start_date:
         raise ValueError("End date must be greater than or equal to start date")
     if (
@@ -92,6 +90,122 @@ def _check_overlap(
 
     # Two ranges overlap if: start1 < end2 AND start2 < end1
     return start1 < end2 and start2 < end1
+
+
+def _date_period_to_boundary_index(date_value, period):
+    period_offset = PERIOD_ORDER[period]
+    return (date_value.toordinal() * 3) + period_offset
+
+
+def _boundary_index_to_date_period(boundary_index):
+    day_ordinal, offset = divmod(boundary_index, 3)
+    if offset == 0:
+        return datetime.fromordinal(day_ordinal).date(), "morning"
+    if offset == 1:
+        return datetime.fromordinal(day_ordinal).date(), "midday"
+    return datetime.fromordinal(day_ordinal + 1).date(), "morning"
+
+
+def _boundary_index_to_end_date_period(boundary_index):
+    day_ordinal, offset = divmod(boundary_index, 3)
+    if offset == 1:
+        return datetime.fromordinal(day_ordinal).date(), "midday"
+    if offset == 2:
+        return datetime.fromordinal(day_ordinal).date(), "evening"
+    return datetime.fromordinal(day_ordinal - 1).date(), "evening"
+
+
+def _apply_interval_to_entry(entry, start_boundary, end_boundary):
+    entry.start_date, entry.start_period = _boundary_index_to_date_period(
+        start_boundary
+    )
+    entry.end_date, entry.end_period = _boundary_index_to_end_date_period(end_boundary)
+    entry.week_number = entry.start_date.isocalendar().week
+    entry.year = entry.start_date.isocalendar().year
+
+
+def _split_overlapping_entry(existing_entry, new_start_boundary, new_end_boundary):
+    existing_start = _date_period_to_boundary_index(
+        existing_entry.start_date, existing_entry.start_period
+    )
+    existing_end = _date_period_to_boundary_index(
+        existing_entry.end_date, existing_entry.end_period
+    )
+
+    if existing_start >= new_end_boundary or new_start_boundary >= existing_end:
+        return
+
+    left_segment = None
+    right_segment = None
+
+    if existing_start < new_start_boundary:
+        left_segment = (existing_start, min(new_start_boundary, existing_end))
+
+    if new_end_boundary < existing_end:
+        right_segment = (max(new_end_boundary, existing_start), existing_end)
+
+    if left_segment and right_segment:
+        _apply_interval_to_entry(existing_entry, left_segment[0], left_segment[1])
+        split_entry = TimeEntry(
+            start_date=existing_entry.start_date,
+            start_period=existing_entry.start_period,
+            end_date=existing_entry.end_date,
+            end_period=existing_entry.end_period,
+            week_number=existing_entry.week_number,
+            year=existing_entry.year,
+            user_id=existing_entry.user_id,
+            project_id=existing_entry.project_id,
+            note=existing_entry.note,
+        )
+        _apply_interval_to_entry(split_entry, right_segment[0], right_segment[1])
+        db.session.add(split_entry)
+        return
+
+    if left_segment:
+        _apply_interval_to_entry(existing_entry, left_segment[0], left_segment[1])
+        return
+
+    if right_segment:
+        _apply_interval_to_entry(existing_entry, right_segment[0], right_segment[1])
+        return
+
+    db.session.delete(existing_entry)
+
+
+def _overwrite_overlapping_entries_for_user(
+    user_id,
+    start_date,
+    start_period,
+    end_date,
+    end_period,
+    exclude_entry_id=None,
+):
+    query = TimeEntry.query.filter_by(user_id=user_id)
+
+    if exclude_entry_id:
+        query = query.filter(TimeEntry.id != exclude_entry_id)
+
+    overlapping_entries = query.filter(
+        TimeEntry.start_date <= end_date,
+        TimeEntry.end_date >= start_date,
+    ).all()
+
+    new_start_boundary = _date_period_to_boundary_index(start_date, start_period)
+    new_end_boundary = _date_period_to_boundary_index(end_date, end_period)
+
+    for existing in overlapping_entries:
+        if not _check_overlap(
+            start_date,
+            start_period,
+            end_date,
+            end_period,
+            existing.start_date,
+            existing.start_period,
+            existing.end_date,
+            existing.end_period,
+        ):
+            continue
+        _split_overlapping_entry(existing, new_start_boundary, new_end_boundary)
 
 
 def _validate_no_overlap_for_user(
@@ -272,6 +386,7 @@ def create_time_entry():
     """Create a new time entry"""
     try:
         data = request.get_json()
+        overwrite_conflicts = bool(data.get("overwrite_conflicts")) if data else False
 
         required_fields = [
             "start_date",
@@ -327,11 +442,20 @@ def create_time_entry():
         if not project:
             return jsonify({"error": "Project not found"}), 404
 
-        is_valid, error_msg = _validate_no_overlap_for_user(
-            data["user_id"], start_date, start_period, end_date, end_period
-        )
-        if not is_valid:
-            return jsonify({"error": error_msg}), 409
+        if overwrite_conflicts:
+            _overwrite_overlapping_entries_for_user(
+                data["user_id"],
+                start_date,
+                start_period,
+                end_date,
+                end_period,
+            )
+        else:
+            is_valid, error_msg = _validate_no_overlap_for_user(
+                data["user_id"], start_date, start_period, end_date, end_period
+            )
+            if not is_valid:
+                return jsonify({"error": error_msg}), 409
 
         entry = TimeEntry(
             start_date=start_date,
@@ -366,6 +490,7 @@ def update_time_entry(id):
     try:
         entry = TimeEntry.query.get_or_404(id)
         data = request.get_json()
+        overwrite_conflicts = bool(data.get("overwrite_conflicts")) if data else False
 
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -453,16 +578,26 @@ def update_time_entry(id):
         if "note" in data:
             entry.note = data["note"] or None
 
-        is_valid, error_msg = _validate_no_overlap_for_user(
-            entry.user_id,
-            entry.start_date,
-            entry.start_period,
-            entry.end_date,
-            entry.end_period,
-            exclude_entry_id=id,
-        )
-        if not is_valid:
-            return jsonify({"error": error_msg}), 409
+        if overwrite_conflicts:
+            _overwrite_overlapping_entries_for_user(
+                entry.user_id,
+                entry.start_date,
+                entry.start_period,
+                entry.end_date,
+                entry.end_period,
+                exclude_entry_id=id,
+            )
+        else:
+            is_valid, error_msg = _validate_no_overlap_for_user(
+                entry.user_id,
+                entry.start_date,
+                entry.start_period,
+                entry.end_date,
+                entry.end_period,
+                exclude_entry_id=id,
+            )
+            if not is_valid:
+                return jsonify({"error": error_msg}), 409
 
         before_entry, after_entry = _find_adjacent_entries(entry)
         if before_entry or after_entry:

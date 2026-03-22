@@ -73,8 +73,8 @@ const KpiCard = ({ title, value, subtitle, color, icon }) => (
   </Card>
 );
 
-// ── Couleur par index pour les codes pointage ─────────────────────────────────
-const getCodePointageColor = (index) => `hsl(${(index * 47 + 30) % 360}, 65%, 55%)`;
+// ── Color helper for tracking codes ─────────────────────────────────────────
+const getTrackingCodeColor = (index) => `hsl(${(index * 47 + 30) % 360}, 65%, 55%)`;
 
 // ── Composant principal ───────────────────────────────────────────────────────
 export default function Stats() {
@@ -159,7 +159,7 @@ export default function Stats() {
   };
 
   // ── Derived values
-  const globalTaux = useMemo(() => {
+  const globalRate = useMemo(() => {
     if (!stats || !stats.users.length || stats.possible_half_days === 0) return null;
     const total = stats.users.reduce((s, u) => s + u.worked_half_days, 0);
     const possible = stats.users.length * stats.possible_half_days;
@@ -175,10 +175,10 @@ export default function Stats() {
   const userBarData = useMemo(() => {
     if (!stats) return [];
     return stats.users.map(u => ({
-      nom: u.name,
-      Présent: u.worked_half_days,
-      Absent: u.absent_half_days,
-      couleur: u.color,
+      name: u.name,
+      present: u.worked_half_days,
+      absent: u.absent_half_days,
+      color: u.color,
     }));
   }, [stats]);
 
@@ -188,7 +188,7 @@ export default function Stats() {
     return stats.projects.map((p, index) => ({
       name: p.name,
       value: p.half_days,
-      color: p.color || getCodePointageColor(index),
+      color: p.color || getTrackingCodeColor(index),
     }));
   }, [stats]);
 
@@ -316,9 +316,9 @@ export default function Stats() {
             <Col xs={6} lg={3}>
               <KpiCard
                 title={t('stats.presenceRate')}
-                value={globalTaux !== null ? `${globalTaux}%` : '—'}
+                value={globalRate !== null ? `${globalRate}%` : '—'}
                 subtitle={userId ? t('stats.forThisUser') || 'for this user' : t('stats.averageAllUsers') || 'average all users'}
-                color={globalTaux >= 80 ? '#2ecc71' : globalTaux >= 50 ? '#f39c12' : '#e74c3c'}
+                color={globalRate >= 80 ? '#2ecc71' : globalRate >= 50 ? '#f39c12' : '#e74c3c'}
                 icon="✅"
               />
             </Col>
@@ -375,7 +375,7 @@ export default function Stats() {
                         />
                         <YAxis
                           type="category"
-                          dataKey="nom"
+                          dataKey="name"
                           width={100}
                           tick={{ fill: chartColors.text, fontSize: 12 }}
                           axisLine={false}
@@ -383,11 +383,11 @@ export default function Stats() {
                         />
                         <Tooltip content={<CustomTooltip unit={t('common.halfDayAbbr')} />} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="Présent" stackId="a" fill={chartColors.presence} radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="Présent" position="insideRight" style={{ fill: '#fff', fontSize: 11, fontWeight: 600 }} formatter={v => v > 0 ? v : ''} />
+                        <Bar dataKey="present" stackId="a" fill={chartColors.presence} radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="present" position="insideRight" style={{ fill: '#fff', fontSize: 11, fontWeight: 600 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
-                        <Bar dataKey="Absent" stackId="a" fill={chartColors.absence} radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="Absent" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
+                        <Bar dataKey="absent" stackId="a" fill={chartColors.absence} radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="absent" position="right" style={{ fill: chartColors.text, fontSize: 11 }} formatter={v => v > 0 ? v : ''} />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -492,7 +492,7 @@ export default function Stats() {
                 <ResponsiveContainer width="100%" height={Math.max(180, stats.users.length * 44)}>
                   <BarChart
                     data={stats.users.map(u => ({
-                      nom: u.name,
+                      name: u.name,
                       'Presence rate (%)': Math.round(u.presence_rate * 100),
                     }))}
                     layout="vertical"
@@ -509,7 +509,7 @@ export default function Stats() {
                     />
                     <YAxis
                       type="category"
-                      dataKey="nom"
+                      dataKey="name"
                       width={100}
                       tick={{ fill: chartColors.text, fontSize: 12 }}
                       axisLine={false}
@@ -648,10 +648,10 @@ export default function Stats() {
                           {stats.users.reduce((s, u) => s + u.absent_half_days, 0)}
                         </td>
                         <td className="text-center">
-                          {globalTaux !== null ? `${globalTaux}%` : '—'}
+                          {globalRate !== null ? `${globalRate}%` : '—'}
                         </td>
                         <td className="text-center">
-                          {globalTaux !== null ? `${100 - globalTaux}%` : '—'}
+                          {globalRate !== null ? `${100 - globalRate}%` : '—'}
                         </td>
                         <td></td>
                       </tr>
@@ -673,7 +673,7 @@ export default function Stats() {
                 <ResponsiveContainer width="100%" height={Math.max(180, stats.users.length * 44 + 40)}>
                   <BarChart
                     data={stats.users.filter(u => u.worked_half_days > 0).map(u => {
-                      const row = { nom: u.name };
+                      const row = { name: u.name };
                       u.by_project.forEach(p => { row[p.name] = p.half_days; });
                       return row;
                     })}
@@ -682,7 +682,7 @@ export default function Stats() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
                     <XAxis type="number" tick={{ fill: chartColors.text, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }} tickLine={false} />
-                    <YAxis type="category" dataKey="nom" width={100} tick={{ fill: chartColors.text, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: chartColors.text, fontSize: 12 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     {stats.projects.map(p => (
@@ -757,7 +757,7 @@ export default function Stats() {
                           {stats.tracking_codes.map((entry, index) => (
                             <Cell
                               key={index}
-                              fill={getCodePointageColor(index)}
+                              fill={getTrackingCodeColor(index)}
                             />
                           ))}
                         </Pie>
@@ -770,9 +770,9 @@ export default function Stats() {
                     <div className="d-flex flex-wrap justify-content-center gap-2 mt-1">
                       {stats.tracking_codes.map((cp, i) => (
                         <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: 12 }}>
-                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: getCodePointageColor(i), display: 'inline-block', flexShrink: 0 }}></span>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: getTrackingCodeColor(i), display: 'inline-block', flexShrink: 0 }}></span>
                           <span>{cp.code}</span>
-                          <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.demi_journees}</Badge>
+                          <Badge bg="secondary" style={{ fontSize: 10 }}>{cp.half_days}</Badge>
                         </div>
                       ))}
                     </div>

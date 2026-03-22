@@ -7,15 +7,15 @@ Covers:
  - Cannot delete a Project that has time entries
  - Cannot delete a User that has time entries
  - Uniqueness constraints
- - Colour validation
+ - Color validation
 """
 
 import io
 
-BASE_CODE = "/api/v1/tracking-codes"
-BASE_PROJ = "/api/v1/projects"
-BASE_USER = "/api/v1/users"
-BASE_ENTRY = "/api/v1/time-entries"
+BASE_CODE = "/api/v1/tracking-code"
+BASE_PROJ = "/api/v1/project"
+BASE_USER = "/api/v1/user"
+BASE_ENTRY = "/api/v1/time-entry"
 
 
 def make_week10_time_entry(user_id, project_id):
@@ -102,7 +102,7 @@ class TestProjectCRUD:
         assert rv.status_code == 200
         assert any(p["name"] == "Development" for p in rv.get_json())
 
-    def test_update_project_colour_and_pattern(self, client, project_dev):
+    def test_update_project_color_and_pattern(self, client, project_dev):
         rv = client.put(
             f"{BASE_PROJ}/{project_dev.id}",
             json={"color": "#1abc9c", "pattern": "striped"},
@@ -193,7 +193,7 @@ class TestUserCRUD:
         assert rv.status_code == 200
         assert any(u["name"] == "Alice" for u in rv.get_json())
 
-    def test_update_user_name_and_colour(self, client, user_alice):
+    def test_update_user_name_and_color(self, client, user_alice):
         rv = client.put(
             f"{BASE_USER}/{user_alice.id}",
             json={"name": "Alice Martin", "color": "#27ae60"},
@@ -203,7 +203,7 @@ class TestUserCRUD:
         assert data["name"] == "Alice Martin"
         assert data["color"] == "#27ae60"
 
-    def test_invalid_colour_format_rejected(self, client):
+    def test_invalid_color_format_rejected(self, client):
         rv = client.post(
             BASE_USER,
             json={"name": "BadColor", "color": "red"},
@@ -293,3 +293,35 @@ class TestCsvImportExport:
         assert rv.status_code == 201
         data = rv.get_json()
         assert data["created"] == 1
+
+    def test_import_project_csv_with_unknown_tracking_code(self, client, code_dev):
+        csv_content = (
+            "name,color,pattern,tracking_code\nOnboarding,#abcdef,dotted,UNKNOWN\n"
+        )
+        rv = client.post(
+            f"{BASE_PROJ}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.csv")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data["created"] == 0
+        assert len(data["errors"]) == 1
+        assert "tracking_code not found" in data["errors"][0]["error"]
+
+    def test_import_project_excel_like_file_with_valid_csv_content(
+        self, client, code_dev
+    ):
+        csv_content = "name,color,pattern,tracking_code\nRoadmap,#112233,solid,DEV\n"
+        rv = client.post(
+            f"{BASE_PROJ}/import-csv",
+            data={"file": (io.BytesIO(csv_content.encode("utf-8")), "projects.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        assert rv.status_code == 201
+        data = rv.get_json()
+        assert data["created"] == 1
+        assert data["updated"] == 0
+        assert len(data["errors"]) == 0
