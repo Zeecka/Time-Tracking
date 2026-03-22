@@ -20,9 +20,12 @@ RUN npm ci
 
 COPY . .
 
-# Bake the API URL at build time (can be overridden)
+# Bake the API URL and language at build time (can be overridden)
 ARG REACT_APP_API_URL=/api/v1
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
+ARG REACT_APP_LANGUAGE=en
+ENV REACT_APP_LANGUAGE=$REACT_APP_LANGUAGE
 
 RUN npm run build
 

@@ -20,4 +20,11 @@ i18n
     },
   });
 
+// Keep the HTML lang attribute in sync with the active locale
+// so screen readers and browser spell-check use the correct language.
+document.documentElement.lang = i18n.language;
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.lang = lng;
+});
+
 export default i18n;

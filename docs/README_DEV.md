@@ -46,41 +46,41 @@ pointage/
 All API routes are prefixed with `/api/v1`.
 
 #### Tracking Codes
-- `GET /api/v1/tracking-code` - List all codes
-- `GET /api/v1/tracking-code/{id}` - Get code details
-- `POST /api/v1/tracking-code` - Create a code
-- `PUT /api/v1/tracking-code/{id}` - Update a code
-- `DELETE /api/v1/tracking-code/{id}` - Delete a code
-- `GET /api/v1/tracking-code/export-csv` - Export codes as CSV
-- `POST /api/v1/tracking-code/import-csv` - Import codes from CSV
+- `GET /api/v1/tracking-codes` - List all codes
+- `GET /api/v1/tracking-codes/{id}` - Get code details
+- `POST /api/v1/tracking-codes` - Create a code
+- `PUT /api/v1/tracking-codes/{id}` - Update a code
+- `DELETE /api/v1/tracking-codes/{id}` - Delete a code
+- `GET /api/v1/tracking-codes/export-csv` - Export codes as CSV
+- `POST /api/v1/tracking-codes/import-csv` - Import codes from CSV
 
 #### Projects
-- `GET /api/v1/project` - List all projects
-- `GET /api/v1/project/{id}` - Get project details
-- `POST /api/v1/project` - Create a project
-- `PUT /api/v1/project/{id}` - Update a project
-- `DELETE /api/v1/project/{id}` - Delete a project
-- `GET /api/v1/project/export-csv` - Export projects as CSV
-- `POST /api/v1/project/import-csv` - Import projects from CSV
+- `GET /api/v1/projects` - List all projects
+- `GET /api/v1/projects/{id}` - Get project details
+- `POST /api/v1/projects` - Create a project
+- `PUT /api/v1/projects/{id}` - Update a project
+- `DELETE /api/v1/projects/{id}` - Delete a project
+- `GET /api/v1/projects/export-csv` - Export projects as CSV
+- `POST /api/v1/projects/import-csv` - Import projects from CSV
 
 #### Users
-- `GET /api/v1/user` - List all users
-- `GET /api/v1/user/{id}` - Get user details
-- `POST /api/v1/user` - Create a user
-- `PUT /api/v1/user/{id}` - Update a user
-- `DELETE /api/v1/user/{id}` - Delete a user
-- `GET /api/v1/user/export-csv` - Export users as CSV
-- `POST /api/v1/user/import-csv` - Import users from CSV
+- `GET /api/v1/users` - List all users
+- `GET /api/v1/users/{id}` - Get user details
+- `POST /api/v1/users` - Create a user
+- `PUT /api/v1/users/{id}` - Update a user
+- `DELETE /api/v1/users/{id}` - Delete a user
+- `GET /api/v1/users/export-csv` - Export users as CSV
+- `POST /api/v1/users/import-csv` - Import users from CSV
 
 #### Time Entries
-- `GET /api/v1/time-entry` - List all time entries (with optional filters)
-- `GET /api/v1/time-entry/{id}` - Get time entry details
-- `POST /api/v1/time-entry` - Create a time entry
-- `POST /api/v1/time-entry/bulk` - Create multiple time entries
-- `PUT /api/v1/time-entry/{id}` - Update a time entry
-- `DELETE /api/v1/time-entry/{id}` - Delete a time entry
-- `GET /api/v1/time-entry/export-csv` - Export time entries as CSV
-- `POST /api/v1/time-entry/import-csv` - Import time entries from CSV
+- `GET /api/v1/time-entries` - List all time entries (with optional filters)
+- `GET /api/v1/time-entries/{id}` - Get time entry details
+- `POST /api/v1/time-entries` - Create a time entry
+- `POST /api/v1/time-entries/bulk` - Create multiple time entries
+- `PUT /api/v1/time-entries/{id}` - Update a time entry
+- `DELETE /api/v1/time-entries/{id}` - Delete a time entry
+- `GET /api/v1/time-entries/export-csv` - Export time entries as CSV
+- `POST /api/v1/time-entries/import-csv` - Import time entries from CSV
 
 #### Stats
 - `GET /api/v1/stats` - Aggregated statistics
