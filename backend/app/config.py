@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _parse_csv_codes_env(value):
+    return [item.strip().upper() for item in value.split(",") if item.strip()]
+
+
 class Config:
     """Base configuration"""
 
@@ -31,11 +35,9 @@ class Config:
         "max_age": 3600,
     }
 
-    # Stats configuration: comma-separated list of project names to exclude from top projects
-    STATS_EXCLUDE_PROJECTS_STR = os.environ.get("STATS_EXCLUDE_PROJECTS", "")
-    STATS_EXCLUDE_PROJECTS = [
-        name.strip() for name in STATS_EXCLUDE_PROJECTS_STR.split(",") if name.strip()
-    ]
+    # Stats configuration: comma-separated tracking codes treated as absence
+    STATS_EXCLUDE_CODES_STR = os.environ.get("STATS_EXCLUDE_CODES", "")
+    STATS_EXCLUDE_CODES = _parse_csv_codes_env(STATS_EXCLUDE_CODES_STR)
 
 
 class DevelopmentConfig(Config):

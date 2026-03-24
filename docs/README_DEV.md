@@ -106,6 +106,12 @@ cp .env.example .env
 
 2. Edit `.env` as needed (optional for development)
 
+### Stats Configuration
+
+- `STATS_EXCLUDE_CODES`: comma-separated list of tracking codes treated as absence time in `/api/v1/stats` (example: `ABS`).
+- Presence is computed as: `non-absence half-days / (non-absence + absence half-days)`.
+- Projects linked to `STATS_EXCLUDE_CODES` are excluded from the stats "Top Projects" section.
+
 ### Language Configuration (frontend)
 
 - The app resolves language from the browser and user preference, without environment variables.

@@ -160,9 +160,10 @@ export default function Stats() {
 
   // ── Derived values
   const globalRate = useMemo(() => {
-    if (!stats || !stats.users.length || stats.possible_half_days === 0) return null;
+    if (!stats || !stats.users.length) return null;
     const total = stats.users.reduce((s, u) => s + u.worked_half_days, 0);
-    const possible = stats.users.length * stats.possible_half_days;
+    const possible = stats.users.reduce((s, u) => s + (u.total_classified_half_days || 0), 0);
+    if (possible === 0) return null;
     return Math.round((total / possible) * 100);
   }, [stats]);
 
@@ -590,7 +591,7 @@ export default function Stats() {
                           </td>
                           <td className="text-center">
                             <strong>{u.worked_half_days}</strong>
-                            <span className="text-muted"> /{stats.possible_half_days}</span>
+                            <span className="text-muted"> /{u.total_classified_half_days || 0}</span>
                           </td>
                           <td className="text-center">
                             <span style={{ color: u.absent_half_days > 0 ? '#e74c3c' : '#2ecc71' }}>

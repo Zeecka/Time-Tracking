@@ -8,8 +8,18 @@ from app.models import Project, TimeEntry, TrackingCode, User
 stats_bp = Blueprint("stats", __name__)
 
 MONTH_NAMES = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 
 
@@ -82,6 +92,10 @@ def _get_unique_weeks_in_range(start, end):
     return result
 
 
+def _normalize_code(code):
+    return (code or "").strip().upper()
+
+
 @stats_bp.route("", methods=["GET"])
 def get_stats():
     """
@@ -120,9 +134,8 @@ def get_stats():
         range_start = date(year, 1, 1)
         range_end = date(year, 12, 31)
 
-    # --- Working time reference -------------------------------------------
+    # --- Working day reference (informational KPI only) -------------------
     working_days = _count_working_days(range_start, range_end)
-    possible_half_days = working_days * 2
 
     # --- Fetch time entries in range --------------------------------------
     q = TimeEntry.query.filter(
@@ -141,6 +154,14 @@ def get_stats():
 
     projects_map = {p.id: p for p in Project.query.all()}
     codes_map = {tc.id: tc for tc in TrackingCode.query.all()}
+    project_code_by_project_id = {}
+    for p in projects_map.values():
+        tc = codes_map.get(p.tracking_code_id)
+        project_code_by_project_id[p.id] = _normalize_code(tc.code if tc else None)
+    exclude_codes = {
+        _normalize_code(code)
+        for code in current_app.config.get("STATS_EXCLUDE_CODES", [])
+    }
 
     # --- Compute per-user stats -------------------------------------------
     user_stats = {
@@ -149,6 +170,7 @@ def get_stats():
             "name": u.name,
             "color": u.color,
             "worked_half_days": 0,
+            "absent_half_days": 0,
             "by_project": {},
         }
         for u in users
@@ -166,30 +188,39 @@ def get_stats():
             range_end,
         )
 
+        if hd <= 0:
+            continue
+
+        proj = projects_map.get(entry.project_id)
+        project_name = proj.name if proj else "?"
+        tracking_code_value = project_code_by_project_id.get(entry.project_id, "")
+        is_absence = tracking_code_value in exclude_codes
+
         if entry.user_id in user_stats:
-            user_stats[entry.user_id]["worked_half_days"] += hd
+            if is_absence:
+                user_stats[entry.user_id]["absent_half_days"] += hd
+            else:
+                user_stats[entry.user_id]["worked_half_days"] += hd
+
             by_proj = user_stats[entry.user_id]["by_project"]
             if entry.project_id not in by_proj:
-                proj = projects_map.get(entry.project_id)
                 by_proj[entry.project_id] = {
                     "project_id": entry.project_id,
-                    "name": proj.name if proj else "?",
+                    "name": project_name,
                     "color": proj.color if proj else "#ccc",
                     "half_days": 0,
                 }
             by_proj[entry.project_id]["half_days"] += hd
 
         if entry.project_id not in project_totals:
-            proj = projects_map.get(entry.project_id)
             project_totals[entry.project_id] = {
                 "project_id": entry.project_id,
-                "name": proj.name if proj else "?",
+                "name": project_name,
                 "color": proj.color if proj else "#ccc",
                 "half_days": 0,
             }
         project_totals[entry.project_id]["half_days"] += hd
 
-        proj = projects_map.get(entry.project_id)
         if proj:
             code_id = proj.tracking_code_id
             if code_id not in code_totals:
@@ -205,10 +236,13 @@ def get_stats():
     users_result = []
     for us in user_stats.values():
         worked = us["worked_half_days"]
-        rate = (
-            round(worked / possible_half_days, 4)
-            if possible_half_days > 0
-            else 0.0
+        absent = us["absent_half_days"]
+        classified_total = worked + absent
+        presence_rate = (
+            round(worked / classified_total, 4) if classified_total > 0 else 0.0
+        )
+        absence_rate = (
+            round(absent / classified_total, 4) if classified_total > 0 else 0.0
         )
         users_result.append(
             {
@@ -216,14 +250,19 @@ def get_stats():
                 "name": us["name"],
                 "color": us["color"],
                 "worked_half_days": worked,
-                "absent_half_days": max(0, possible_half_days - worked),
-                "presence_rate": min(1.0, rate),
-                "absence_rate": max(0.0, round(1.0 - rate, 4)),
+                "absent_half_days": absent,
+                "total_classified_half_days": classified_total,
+                "presence_rate": min(1.0, presence_rate),
+                "absence_rate": min(1.0, absence_rate),
                 "by_project": sorted(
                     us["by_project"].values(), key=lambda x: -x["half_days"]
                 ),
             }
         )
+
+    total_worked_half_days = sum(u["worked_half_days"] for u in users_result)
+    total_absent_half_days = sum(u["absent_half_days"] for u in users_result)
+    total_classified_half_days = total_worked_half_days + total_absent_half_days
 
     # --- Trend data -------------------------------------------------------
     trend = []
@@ -233,9 +272,10 @@ def get_stats():
             last_day = calendar.monthrange(year, m)[1]
             m_start = date(year, m, 1)
             m_end = date(year, m, last_day)
-            m_possible = _count_working_days(m_start, m_end) * 2
-            m_hd = sum(
-                _count_half_days_in_range(
+            m_worked = 0
+            m_absent = 0
+            for e in entries:
+                m_entry_hd = _count_half_days_in_range(
                     e.start_date,
                     e.start_period,
                     e.end_date,
@@ -243,15 +283,23 @@ def get_stats():
                     m_start,
                     m_end,
                 )
-                for e in entries
-            )
+                if m_entry_hd <= 0:
+                    continue
+                m_is_absence = (
+                    project_code_by_project_id.get(e.project_id, "") in exclude_codes
+                )
+                if m_is_absence:
+                    m_absent += m_entry_hd
+                else:
+                    m_worked += m_entry_hd
+
             trend.append(
                 {
                     "label": MONTH_NAMES[m - 1],
                     "month": m,
                     "year": year,
-                    "half_days": m_hd,
-                    "possible_half_days": m_possible,
+                    "half_days": m_worked,
+                    "possible_half_days": m_worked + m_absent,
                 }
             )
 
@@ -260,9 +308,10 @@ def get_stats():
             w_start, w_end = _get_iso_week_date_range(w_year, w_num)
             w_start = max(w_start, range_start)
             w_end = min(w_end, range_end)
-            w_possible = _count_working_days(w_start, w_end) * 2
-            w_hd = sum(
-                _count_half_days_in_range(
+            w_worked = 0
+            w_absent = 0
+            for e in entries:
+                w_entry_hd = _count_half_days_in_range(
                     e.start_date,
                     e.start_period,
                     e.end_date,
@@ -270,19 +319,25 @@ def get_stats():
                     w_start,
                     w_end,
                 )
-                for e in entries
-            )
+                if w_entry_hd <= 0:
+                    continue
+                w_is_absence = (
+                    project_code_by_project_id.get(e.project_id, "") in exclude_codes
+                )
+                if w_is_absence:
+                    w_absent += w_entry_hd
+                else:
+                    w_worked += w_entry_hd
+
             trend.append(
                 {
                     "label": f"W{w_num}",
                     "week": w_num,
                     "year": w_year,
-                    "half_days": w_hd,
-                    "possible_half_days": w_possible,
+                    "half_days": w_worked,
+                    "possible_half_days": w_worked + w_absent,
                 }
             )
-
-    exclude_projects = current_app.config.get("STATS_EXCLUDE_PROJECTS", [])
 
     return jsonify(
         {
@@ -295,16 +350,23 @@ def get_stats():
                 "range_end": range_end.isoformat(),
             },
             "working_days": working_days,
-            "possible_half_days": possible_half_days,
-            "users": sorted(
-                users_result, key=lambda x: -x["worked_half_days"]
-            ),
+            "possible_half_days": total_classified_half_days,
+            "users": sorted(users_result, key=lambda x: -x["worked_half_days"]),
             "projects": sorted(
-                (v for v in project_totals.values() if v["name"] not in exclude_projects),
+                (
+                    v
+                    for v in project_totals.values()
+                    if project_code_by_project_id.get(v["project_id"], "")
+                    not in exclude_codes
+                ),
                 key=lambda x: -x["half_days"],
             ),
             "tracking_codes": sorted(
-                code_totals.values(),
+                (
+                    v
+                    for v in code_totals.values()
+                    if _normalize_code(v["code"]) not in exclude_codes
+                ),
                 key=lambda x: -x["half_days"],
             ),
             "trend": trend,
