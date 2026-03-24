@@ -14,7 +14,7 @@ class Config:
     # Database configuration
     DATABASE_URL = (
         os.environ.get("DATABASE_URL")
-        or "mysql+pymysql://pointage_user:pointage_password@localhost:3306/pointage_db"
+        or "mysql+pymysql://record_user:record_password@localhost:3306/record_db"
     )
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
 
@@ -34,9 +34,7 @@ class Config:
     # Stats configuration: comma-separated list of project names to exclude from top projects
     STATS_EXCLUDE_PROJECTS_STR = os.environ.get("STATS_EXCLUDE_PROJECTS", "")
     STATS_EXCLUDE_PROJECTS = [
-        name.strip()
-        for name in STATS_EXCLUDE_PROJECTS_STR.split(",")
-        if name.strip()
+        name.strip() for name in STATS_EXCLUDE_PROJECTS_STR.split(",") if name.strip()
     ]
 
 
