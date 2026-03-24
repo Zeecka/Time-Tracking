@@ -149,30 +149,30 @@
 }
 
 /* Table vertical alignment */
-.pointage-table tbody td,
+.record-table tbody td,
 .utilisateur-table tbody td,
 .projet-table tbody td,
-.code-pointage-table tbody td {
+.code-record-table tbody td {
   vertical-align: middle;
 }
 
-/* Pointage Table Styling */
-.pointage-table {
+/* Record Table Styling */
+.record-table {
   margin-bottom: 1rem;
 }
 
-.pointage-table thead th {
+.record-table thead th {
   vertical-align: middle;
   padding: 0.75rem;
   font-weight: 600;
 }
 
-.pointage-table tbody td {
+.record-table tbody td {
   vertical-align: middle;
   padding: 0.25rem 0.75rem;
 }
 
-.pointage-table tbody tr {
+.record-table tbody tr {
   height: auto;
 }
 

@@ -5,7 +5,7 @@ This documentation covers all technical information useful for local development
 ## Project Structure
 
 ```
-pointage/
+Time-Tracking/
 ├── compose.dev.yml            # Dev orchestration (watch + reload)
 ├── compose.yml                # Standard orchestration
 ├── package.json               # Root utility scripts
@@ -113,7 +113,7 @@ cp .env.example .env
 
 Priority order used by the app:
 
-1. `localStorage` (`pointage-language`)
+1. `localStorage` (`record-language`)
 2. Browser language (`navigator.languages` / `navigator.language`)
 3. `en`
 
@@ -148,7 +148,7 @@ Services will be available at:
 
 ```bash
 # Connect to the backend container
-docker exec -it pointage_backend bash
+docker exec -it record_backend bash
 
 # Tables are created automatically on application startup
 flask seed-dev

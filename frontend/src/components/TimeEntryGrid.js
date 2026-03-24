@@ -1627,7 +1627,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
 <p className="text-center text-muted py-4">{t('common.noData')}</p>
               ) : (
                 <div className="table-responsive">
-                  <Table bordered hover className="pointage-table">
+                  <Table bordered hover className="record-table">
                     <thead>
                       <tr>
                         <th>{t('timeEntry.project')}</th>
@@ -1727,7 +1727,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           )}
 
           {isTableView && groupedView && (
-          <Table striped bordered hover className="pointage-table">
+          <Table striped bordered hover className="record-table">
             <thead>
               <tr>
                 <th>{t('timeEntry.user')}</th>
@@ -1790,7 +1790,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           )}
 
           {isTableView && !groupedView && (
-          <Table striped bordered hover className="pointage-table">
+          <Table striped bordered hover className="record-table">
             <thead>
               <tr>
                 <th onClick={() => handleSort('user')} style={{ cursor: 'pointer', userSelect: 'none' }}>

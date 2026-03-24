@@ -15,7 +15,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: zeecka
-  IMAGE_REPO: pointage
+  IMAGE_REPO: record
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────

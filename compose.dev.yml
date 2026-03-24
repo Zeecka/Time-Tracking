@@ -1,7 +1,7 @@
 services:
   mariadb:
     image: mariadb:11.2
-    container_name: pointage_db_dev
+    container_name: record_db_dev
     restart: unless-stopped
     env_file:
       - .env
@@ -10,7 +10,7 @@ services:
     ports:
       - "3306:3306"
     networks:
-      - pointage_network_dev
+      - record_network_dev
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -21,7 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pointage_backend_dev
+    container_name: record_backend_dev
     restart: unless-stopped
     env_file:
       - .env
@@ -38,7 +38,7 @@ services:
       mariadb:
         condition: service_healthy
     networks:
-      - pointage_network_dev
+      - record_network_dev
     #command: sh -c "flask init-db --reset && flask run --host=0.0.0.0 --port=5000 --debug"
     command: sh -c "flask init-db --reset && flask seed-dev && flask run --host=0.0.0.0 --port=5000 --debug"
     develop:
@@ -59,7 +59,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: dev
-    container_name: pointage_frontend_dev
+    container_name: record_frontend_dev
     restart: unless-stopped
     env_file:
       - .env
@@ -74,7 +74,7 @@ services:
     depends_on:
       - backend
     networks:
-      - pointage_network_dev
+      - record_network_dev
     stdin_open: true
     tty: true
     command: npm start
@@ -93,5 +93,5 @@ volumes:
   mariadb_data_dev:
 
 networks:
-  pointage_network_dev:
+  record_network_dev:
     driver: bridge

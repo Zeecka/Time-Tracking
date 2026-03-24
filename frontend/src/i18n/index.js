@@ -4,7 +4,7 @@ import { initReactI18next } from 'react-i18next';
 import en from './en.json';
 import fr from './fr.json';
 
-const LANGUAGE_STORAGE_KEY = 'pointage-language';
+const LANGUAGE_STORAGE_KEY = 'record-language';
 const SUPPORTED_LANGUAGES = ['en', 'fr'];
 
 const normalizeLanguage = (value) => {

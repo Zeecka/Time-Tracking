@@ -1,14 +1,14 @@
 services:
   mariadb:
     image: mariadb:11.2
-    container_name: pointage_db
+    container_name: record_db
     restart: unless-stopped
     env_file:
       - .env
     volumes:
       - mariadb_data:/var/lib/mysql
     networks:
-      - pointage_network
+      - record_network
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -16,11 +16,11 @@ services:
       retries: 5
 
   backend:
-    image: pointage:backend
+    image: record:backend
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pointage_backend
+    container_name: record_backend
     restart: unless-stopped
     env_file:
       - .env
@@ -32,16 +32,16 @@ services:
       mariadb:
         condition: service_healthy
     networks:
-      - pointage_network
+      - record_network
 
   frontend:
-    image: pointage:frontend
+    image: record:frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: /api/v1
-    container_name: pointage_frontend
+    container_name: record_frontend
     restart: unless-stopped
     env_file:
       - .env
@@ -50,11 +50,11 @@ services:
     depends_on:
       - backend
     networks:
-      - pointage_network
+      - record_network
 
 volumes:
   mariadb_data:
 
 networks:
-  pointage_network:
+  record_network:
     driver: bridge

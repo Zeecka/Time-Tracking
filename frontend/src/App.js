@@ -14,8 +14,8 @@ import Home from './components/Home';
 import ExportExcel from './components/ExportExcel';
 import Stats from './components/Stats';
 
-const THEME_STORAGE_KEY = 'pointage-theme';
-const LANGUAGE_STORAGE_KEY = 'pointage-language';
+const THEME_STORAGE_KEY = 'record-theme';
+const LANGUAGE_STORAGE_KEY = 'record-language';
 const SUPPORTED_LANGUAGES = ['en', 'fr'];
 
 const normalizeLanguage = (value) => {

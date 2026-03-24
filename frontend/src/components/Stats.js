@@ -694,7 +694,7 @@ export default function Stats() {
             </Card>
           )}
 
-          {/* Distribution par code pointage */}
+          {/* Distribution par code record */}
           {stats.tracking_codes && stats.tracking_codes.length > 0 && (
             <Row className="g-3 mb-4">
               <Col xs={12} lg={7}>

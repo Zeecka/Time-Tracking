@@ -132,10 +132,7 @@ All development documentation (setup, seed, local execution, type-checking, tech
 ## Future Improvements
 
 - [ ] Add a full DB export/import feature
-- [ ] i18n support
 - [ ] OIDC authentication
-- [ ] Advanced spreadsheet-style interface (AG-Grid)
-- [ ] Reports and statistics (aggregations by project/user/period)
 - [ ] User permissions management
 - [ ] Soft delete for history tracking
 - [ ] Full-text search API
