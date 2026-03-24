@@ -15,6 +15,17 @@ import ExportExcel from './components/ExportExcel';
 import Stats from './components/Stats';
 
 const THEME_STORAGE_KEY = 'pointage-theme';
+const LANGUAGE_STORAGE_KEY = 'pointage-language';
+const SUPPORTED_LANGUAGES = ['en', 'fr'];
+
+const normalizeLanguage = (value) => {
+  if (typeof value !== 'string') {
+    return 'en';
+  }
+
+  const normalized = value.toLowerCase().split('-')[0];
+  return SUPPORTED_LANGUAGES.includes(normalized) ? normalized : 'en';
+};
 
 const getInitialTheme = () => {
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -27,7 +38,8 @@ const getInitialTheme = () => {
 
 function App() {
   const [theme, setTheme] = useState(getInitialTheme);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [language, setLanguage] = useState(() => normalizeLanguage(i18n.resolvedLanguage || i18n.language));
 
   useEffect(() => {
     document.documentElement.setAttribute('data-bs-theme', theme);
@@ -47,8 +59,31 @@ function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  useEffect(() => {
+    const handleLanguageChanged = (nextLanguage) => {
+      setLanguage(normalizeLanguage(nextLanguage));
+    };
+
+    i18n.on('languageChanged', handleLanguageChanged);
+    return () => i18n.off('languageChanged', handleLanguageChanged);
+  }, [i18n]);
+
+  useEffect(() => {
+    const nextLanguage = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
+    setLanguage(nextLanguage);
+  }, [i18n]);
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleLanguageChange = async (event) => {
+    const nextLanguage = normalizeLanguage(event.target.value);
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+
+    if (nextLanguage !== normalizeLanguage(i18n.language)) {
+      await i18n.changeLanguage(nextLanguage);
+    }
   };
 
   return (
@@ -80,6 +115,16 @@ function App() {
               </Nav>
               <Nav>
                 <div className="d-flex align-items-center gap-2">
+                  <Form.Select
+                    size="sm"
+                    value={language}
+                    onChange={handleLanguageChange}
+                    aria-label={t('nav.selectLanguage')}
+                    style={{ width: 'auto' }}
+                  >
+                    <option value="en">EN</option>
+                    <option value="fr">FR</option>
+                  </Form.Select>
                   <Button
                     variant="link"
                     aria-label={t('nav.currentTheme')}

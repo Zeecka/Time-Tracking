@@ -45,8 +45,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      APP_LANGUAGE: ${APP_LANGUAGE:-en}
     ports:
       - "80:80"
     depends_on:

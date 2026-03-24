@@ -106,6 +106,17 @@ cp .env.example .env
 
 2. Edit `.env` as needed (optional for development)
 
+### Language Configuration (frontend)
+
+- The app resolves language from the browser and user preference, without environment variables.
+- User choice from the UI language selector is stored in `localStorage` and takes precedence on next reload.
+
+Priority order used by the app:
+
+1. `localStorage` (`pointage-language`)
+2. Browser language (`navigator.languages` / `navigator.language`)
+3. `en`
+
 ## Starting with Docker Compose
 
 ```bash

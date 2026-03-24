@@ -38,10 +38,4 @@ COPY --from=builder /app/build /usr/share/nginx/html
 # Custom nginx config — SPA fallback (all routes → index.html)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Entrypoint: write runtime config (APP_LANGUAGE) before nginx starts
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 EXPOSE 80
-
-ENTRYPOINT ["/docker-entrypoint.sh"]
