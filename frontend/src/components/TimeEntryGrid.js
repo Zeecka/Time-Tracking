@@ -1391,135 +1391,136 @@ function TimeEntryGrid({ viewMode = 'table' }) {
         </div>
       </div>
 
-      <Row className="mb-3">
-        <Col>
-          <div className="d-flex gap-2 align-items-center flex-wrap">
+      <div className="app-content-panel time-entry-content-panel">
+        <div className="time-entry-topbar mb-3">
+          <div className="time-entry-topbar-main">
+            <div className="app-route-tabs" aria-label={t('timeEntry.title')}>
+              <Link
+                to={`/time-entries/gantt${weekQueryString}`}
+                className={`app-route-tab${isGanttView ? ' active' : ''}`}
+              >
+                <i className="fas fa-stream"></i>
+                <span>{t('grid.ganttView')}</span>
+              </Link>
+              <Link
+                to={`/time-entries/table${weekQueryString}`}
+                className={`app-route-tab${isTableView ? ' active' : ''}`}
+              >
+                <i className="fas fa-table"></i>
+                <span>{t('grid.tableView')}</span>
+              </Link>
+              <Link
+                to={`/time-entries/synthesis${weekQueryString}`}
+                className={`app-route-tab${isSynthesisView ? ' active' : ''}`}
+              >
+                <i className="fas fa-th-list"></i>
+                <span>{t('grid.synthesisView')}</span>
+              </Link>
+            </div>
+          </div>
+
+          {isTableView && (
             <Button
-              as={Link}
-              to={`/time-entries/gantt${weekQueryString}`}
-              variant={isGanttView ? 'dark' : 'outline-secondary'}
+              type="button"
+              variant={groupedView ? 'primary' : 'outline-secondary'}
               size="sm"
+              onClick={() => setGroupedView((prev) => !prev)}
+              aria-pressed={groupedView}
+              className={`time-entry-group-toggle ${groupedView ? 'is-active' : ''}`}
             >
-              {t('grid.ganttView')}
+              <i className={`fas ${groupedView ? 'fa-layer-group' : 'fa-bars-staggered'} me-2`}></i>
+              <span className="time-entry-group-toggle-text">{t('grid.groupedView')}</span>
+              <span className="time-entry-group-toggle-track" aria-hidden="true">
+                <span className="time-entry-group-toggle-thumb" />
+              </span>
             </Button>
-            <Button
-              as={Link}
-              to={`/time-entries/table${weekQueryString}`}
-              variant={isTableView ? 'dark' : 'outline-secondary'}
-              size="sm"
-            >
-              {t('grid.tableView')}
-            </Button>
-            <Button
-              as={Link}
-              to={`/time-entries/synthesis${weekQueryString}`}
-              variant={isSynthesisView ? 'dark' : 'outline-secondary'}
-              size="sm"
-            >
-              {t('grid.synthesisView')}
-            </Button>
-            {isTableView && (
-              <Form.Check
-                type="switch"
-                id="grouped-view-switch"
-                label={t('grid.groupedView')}
-                checked={groupedView}
-                onChange={(e) => setGroupedView(e.target.checked)}
-                className="ms-2 mb-0"
+          )}
+
+          <div className="time-entry-period-controls" aria-label={t('grid.weekView')}>
+            <Form.Group className="time-entry-period-field mb-0">
+              <Form.Label>{t('common.year')}</Form.Label>
+              <Form.Control
+                type="number"
+                name="year"
+                value={Number.isFinite(filters.year) ? filters.year : ''}
+                onChange={handleFilterChange}
+                min="2000"
+                max="2100"
               />
-            )}
+            </Form.Group>
+            <Form.Group className="time-entry-period-field mb-0">
+              <Form.Label>{t('common.week')}</Form.Label>
+              <Form.Control
+                type="number"
+                name="week_number"
+                value={Number.isFinite(filters.week_number) ? filters.week_number : ''}
+                onChange={handleFilterChange}
+                min="1"
+                max="53"
+                placeholder={t('grid.allWeeks') || 'All'}
+              />
+            </Form.Group>
+            <div className="time-entry-period-nav">
+              <Button
+                variant="outline-secondary"
+                onClick={() => handleWeekShift(-1)}
+                aria-label={t('grid.prevWeek')}
+                className="d-flex align-items-center justify-content-center"
+                style={{ width: '40px', height: '38px' }}
+              >
+                <i className="fas fa-chevron-left"></i>
+              </Button>
+              <Button
+                variant="outline-secondary"
+                onClick={() => handleWeekShift(1)}
+                aria-label={t('grid.nextWeek')}
+                className="d-flex align-items-center justify-content-center"
+                style={{ width: '40px', height: '38px' }}
+              >
+                <i className="fas fa-chevron-right"></i>
+              </Button>
+            </div>
           </div>
-        </Col>
-      </Row>
+        </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
-      {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
+        {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+        {message && <Alert variant="success" dismissible onClose={() => setMessage('')}>{message}</Alert>}
 
-      {/* Filters */}
-      <Row className="mb-3">
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>{t('common.year')}</Form.Label>
-            <Form.Control
-              type="number"
-              name="year"
-              value={Number.isFinite(filters.year) ? filters.year : ''}
-              onChange={handleFilterChange}
-              min="2000"
-              max="2100"
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>{t('common.week')}</Form.Label>
-            <Form.Control
-              type="number"
-              name="week_number"
-              value={Number.isFinite(filters.week_number) ? filters.week_number : ''}
-              onChange={handleFilterChange}
-              min="1"
-              max="53"
-              placeholder={t('grid.allWeeks') || 'All'}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3} className="d-flex align-items-end gap-2">
-          <Button
-            variant="outline-secondary"
-            onClick={() => handleWeekShift(-1)}
-            aria-label={t('grid.prevWeek')}
-            className="d-flex align-items-center justify-content-center"
-            style={{ width: '40px', height: '38px' }}
-          >
-            <i className="fas fa-chevron-left"></i>
-          </Button>
-          <Button
-            variant="outline-secondary"
-            onClick={() => handleWeekShift(1)}
-            aria-label={t('grid.nextWeek')}
-            className="d-flex align-items-center justify-content-center"
-            style={{ width: '40px', height: '38px' }}
-          >
-            <i className="fas fa-chevron-right"></i>
-          </Button>
-        </Col>
-      </Row>
-      <Row className="mb-3">
-        <Col>
-          <div className="text-muted">{selectedWeekLabel}</div>
-        </Col>
-      </Row>
+        <Row className="mb-3">
+          <Col>
+            <div className="text-muted">{selectedWeekLabel}</div>
+          </Col>
+        </Row>
 
-      <Row className="mb-3">
-        <Col>
-          <div className="d-flex flex-wrap align-items-center gap-2">
-            <strong>{t('grid.missingDays') || 'Missing days:'}:</strong>
-            {missingDaysSummary.length > 0 ? (
-              missingDaysSummary.map((user) => (
-                <span key={user.id} className="badge bg-light text-dark border d-flex align-items-center gap-2">
-                  <span
-                    style={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      backgroundColor: user.color,
-                      display: 'inline-block',
-                    }}
-                  />
-                  {user.name}: {formatDayValue(user.missingDays)} j
-                </span>
-              ))
-            ) : (
-              <span className="text-muted">{t('stats.allUsers')}</span>
-            )}
-          </div>
-        </Col>
-      </Row>
+        <Row className="mb-3">
+          <Col>
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <strong>{t('grid.missingDays') || 'Missing days:'}:</strong>
+              {missingDaysSummary.length > 0 ? (
+                missingDaysSummary.map((user) => (
+                  <span key={user.id} className="badge bg-light text-dark border d-flex align-items-center gap-2">
+                    <span
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        backgroundColor: user.color,
+                        display: 'inline-block',
+                      }}
+                    />
+                    {user.name}: {formatDayValue(user.missingDays)} j
+                  </span>
+                ))
+              ) : (
+                <span className="text-muted">{t('stats.allUsers')}</span>
+              )}
+            </div>
+          </Col>
+        </Row>
 
-      {loading ? (
-        <p>{t('common.loading')}</p>
-      ) : (
+        {loading ? (
+          <p>{t('common.loading')}</p>
+        ) : (
         <>
           {isGanttView && (
           <div className="gantt-view mb-3">
@@ -1626,8 +1627,8 @@ function TimeEntryGrid({ viewMode = 'table' }) {
               {synthesisData.projects.length === 0 ? (
 <p className="text-center text-muted py-4">{t('common.noData')}</p>
               ) : (
-                <div className="table-responsive">
-                  <Table bordered hover className="record-table">
+                <div className="table-responsive record-table-wrap">
+                  <Table hover className="record-table">
                     <thead>
                       <tr>
                         <th>{t('timeEntry.project')}</th>
@@ -1727,7 +1728,8 @@ function TimeEntryGrid({ viewMode = 'table' }) {
           )}
 
           {isTableView && groupedView && (
-          <Table striped bordered hover className="record-table">
+          <div className="record-table-wrap">
+          <Table striped hover className="record-table">
             <thead>
               <tr>
                 <th>{t('timeEntry.user')}</th>
@@ -1787,10 +1789,12 @@ function TimeEntryGrid({ viewMode = 'table' }) {
               )}
             </tbody>
           </Table>
+          </div>
           )}
 
           {isTableView && !groupedView && (
-          <Table striped bordered hover className="record-table">
+          <div className="record-table-wrap">
+          <Table striped hover className="record-table">
             <thead>
               <tr>
                 <th onClick={() => handleSort('user')} style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -1913,9 +1917,11 @@ function TimeEntryGrid({ viewMode = 'table' }) {
               )}
             </tbody>
           </Table>
+          </div>
           )}
         </>
-      )}
+        )}
+      </div>
 
       <Modal show={showModal} onHide={handleCloseModal} keyboard onEscapeKeyDown={handleCloseModal}>
         <Modal.Header closeButton>

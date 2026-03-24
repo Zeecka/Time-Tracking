@@ -85,6 +85,10 @@ Technical documentation (project structure + REST API): [docs/README_DEV.md](doc
 
 ![Statistics](docs/assets/stats.png)
 
+### New Entry
+
+![New Entry](docs/assets/newentry.png)
+
 ### Export
 
 ![Export](docs/assets/export.png)
