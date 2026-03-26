@@ -88,7 +88,7 @@ function AppLayout({
                   as={NavLink}
                   to={item.to}
                   end={item.end}
-                  className="app-nav-link"
+                  className={({ isActive }) => `app-nav-link${isActive ? ' active' : ''}`}
                 >
                   <i className={`fas fa-${item.icon}`}></i>
                   <span>{t(item.labelKey)}</span>
