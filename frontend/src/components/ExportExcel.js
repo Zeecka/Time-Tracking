@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Form, Alert, Row, Col, Card, Table } from 'react-bootstrap';
+import Select from 'react-select';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
-import { timeEntryAPI } from '../services/api';
+import { timeEntryAPI, userAPI } from '../services/api';
 
 const getCurrentIsoWeekInfo = () => {
   const now = new Date();
@@ -328,10 +329,64 @@ function ExportExcel() {
     end_week_number: CURRENT_WEEK_INFO.week,
   });
   const [timeEntries, setTimeEntries] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedColumns, setSelectedColumns] = useState(() => getDefaultSelectedColumns(EXPORT_COLUMN_DEFS));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+
+  const customSelectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-bg)',
+      borderColor: state.isFocused ? 'var(--rs-focus-border)' : 'var(--rs-border)',
+      boxShadow: state.isFocused ? '0 0 0 0.25rem var(--rs-focus-shadow)' : 'none',
+      '&:hover': {
+        borderColor: 'var(--rs-focus-border)',
+      },
+      minHeight: '38px',
+      fontSize: '14px',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-menu-bg)',
+      zIndex: 999999,
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? 'var(--rs-option-selected)'
+        : state.isFocused
+          ? 'var(--rs-option-focused)'
+          : 'var(--rs-menu-bg)',
+      color: state.isSelected ? '#fff' : 'var(--rs-option-color)',
+      cursor: 'pointer',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
+    input: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
+  };
+
+  const userOptions = useMemo(() => ([
+    { value: '', label: t('stats.allUsers') },
+    ...users.map((user) => ({ value: String(user.id), label: user.name })),
+  ]), [t, users]);
+
+  const selectedUserOption = useMemo(() => (
+    userOptions.find((option) => option.value === String(selectedUserId)) || userOptions[0]
+  ), [selectedUserId, userOptions]);
+
+  useEffect(() => {
+    userAPI.getAll()
+      .then((response) => setUsers(response.data || []))
+      .catch(() => {});
+  }, []);
 
   const loadTimeEntries = useCallback(async (filterParams) => {
     try {
@@ -350,6 +405,7 @@ function ExportExcel() {
         weeksToLoad.map((week) => timeEntryAPI.getAll({
           year: week.year,
           week_number: week.week_number,
+          ...(selectedUserId ? { user_id: selectedUserId } : {}),
         })),
       );
 
@@ -376,7 +432,7 @@ function ExportExcel() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [selectedUserId, t]);
 
   useEffect(() => {
     loadTimeEntries(filters);
@@ -482,8 +538,8 @@ function ExportExcel() {
           <h5 className="mb-0">{t('export.selectPeriod') || 'Select period'}</h5>
         </Card.Header>
         <Card.Body>
-          <Row className="mb-3">
-            <Col md={3}>
+          <Row className="mb-3 align-items-end">
+            <Col md={2}>
               <Form.Group>
                 <Form.Label>{t('export.startYear') || 'Start year'}</Form.Label>
                 <Form.Control
@@ -496,7 +552,7 @@ function ExportExcel() {
                 />
               </Form.Group>
             </Col>
-            <Col md={3}>
+            <Col md={2}>
               <Form.Group>
                 <Form.Label>{t('export.startWeek') || 'Start week'}</Form.Label>
                 <Form.Control
@@ -509,7 +565,7 @@ function ExportExcel() {
                 />
               </Form.Group>
             </Col>
-            <Col md={3}>
+            <Col md={2}>
               <Form.Group>
                 <Form.Label>{t('export.endYear') || 'End year'}</Form.Label>
                 <Form.Control
@@ -522,7 +578,7 @@ function ExportExcel() {
                 />
               </Form.Group>
             </Col>
-            <Col md={3}>
+            <Col md={2}>
               <Form.Group>
                 <Form.Label>{t('export.endWeek') || 'End week'}</Form.Label>
                 <Form.Control
@@ -532,6 +588,22 @@ function ExportExcel() {
                   onChange={handleFilterChange}
                   min="1"
                   max="53"
+                />
+              </Form.Group>
+            </Col>
+            <Col md={4}>
+              <Form.Group>
+                <Form.Label>{t('timeEntry.user')}</Form.Label>
+                <Select
+                  options={userOptions}
+                  value={selectedUserOption}
+                  onChange={(option) => setSelectedUserId(option?.value || '')}
+                  styles={customSelectStyles}
+                  classNamePrefix="rs"
+                  className="rs-select"
+                  isSearchable
+                  isClearable={false}
+                  menuPortalTarget={document.body}
                 />
               </Form.Group>
             </Col>
