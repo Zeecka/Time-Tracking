@@ -770,8 +770,66 @@ function TimeEntryGrid({ viewMode = 'table' }) {
     };
   }, [filters, findOverlappingTimeEntries, ganttResizeState, getDateAndPeriodFromBoundary, isOverlapApiError, loadTimeEntries, localizeApiError, openConflictModalForData, timeEntries]);
 
+  const isAfternoonAvailable = (userId, dateString) => {
+    if (!userId) return true;
+
+    // Check if the midday slot is occupied for the given date and user
+    const userEntries = timeEntries.filter(
+      (entry) => entry.user_id === parseInt(userId)
+    );
+
+    for (const entry of userEntries) {
+      const entryStart = new Date(entry.start_date + 'T00:00:00Z');
+      const entryEnd = new Date(entry.end_date + 'T00:00:00Z');
+      const targetDate = new Date(dateString + 'T00:00:00Z');
+
+      // Check if the target date falls within the entry range
+      if (entryStart <= targetDate && targetDate <= entryEnd) {
+        const startPeriod = normalizePeriodValue(entry.start_period, true);
+        const endPeriod = normalizePeriodValue(entry.end_period, false);
+
+        // Check if the entry is on the same day as target date
+        if (entry.start_date === dateString && entry.end_date === dateString) {
+          // Same day entry - check if it covers midday
+          if (startPeriod === 'morning' && endPeriod === 'evening') {
+            return false; // Full day is occupied
+          }
+          if (startPeriod === 'morning' && endPeriod === 'midday') {
+            return false; // Morning covering midday is occupied
+          }
+          if (startPeriod === 'midday' && endPeriod === 'evening') {
+            return false; // Midday is directly occupied
+          }
+        } else if (entry.start_date === dateString) {
+          // Entry starts on target date - check start period
+          if (startPeriod === 'morning') {
+            return false; // Entry covers morning through to next day
+          }
+        } else if (entry.end_date === dateString) {
+          // Entry ends on target date - check end period
+          if (endPeriod === 'evening') {
+            return false; // Entry covers midday to evening
+          }
+        } else {
+          // Entry spans across target date completely
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
   const handleSlotClick = (userId, projectId, slotIndex) => {
     const slotData = getDateAndPeriodFromSlot(slotIndex);
+
+    // When clicking on morning, check if afternoon is available
+    let endPeriod = 'midday';
+    if (slotData.period === 'morning' && isAfternoonAvailable(userId, slotData.date)) {
+      endPeriod = 'evening'; // Full day if afternoon is free
+    } else if (slotData.period === 'midday') {
+      endPeriod = 'evening';
+    }
 
     openSlotCreation({
       user_id: userId,
@@ -779,7 +837,7 @@ function TimeEntryGrid({ viewMode = 'table' }) {
       start_date: slotData.date,
       start_period: slotData.period,
       end_date: slotData.date,
-      end_period: slotData.period === 'morning' ? 'midday' : 'evening',
+      end_period: endPeriod,
     });
   };
 
