@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, Button, Modal, Form, Alert } from 'react-bootstrap';
+import Select from 'react-select';
 import { useTranslation } from 'react-i18next';
 import { projectAPI, trackingCodeAPI } from '../services/api';
 
@@ -138,6 +139,44 @@ function ProjectList() {
 
   const handleImportClick = () => {
     importInputRef.current?.click();
+  };
+
+  // ── Custom select styles for react-select
+  const customSelectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-bg)',
+      borderColor: state.isFocused ? 'var(--rs-focus-border)' : 'var(--rs-border)',
+      boxShadow: state.isFocused ? '0 0 0 0.25rem var(--rs-focus-shadow)' : 'none',
+      '&:hover': {
+        borderColor: 'var(--rs-focus-border)',
+      },
+      minHeight: '38px',
+      fontSize: '14px',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-menu-bg)',
+      zIndex: 9999,
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? 'var(--rs-option-selected)'
+        : state.isFocused
+        ? 'var(--rs-option-focused)'
+        : 'var(--rs-menu-bg)',
+      color: state.isSelected ? '#fff' : 'var(--rs-option-color)',
+      cursor: 'pointer',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
+    input: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
   };
 
   const handleImportCSV = async (e) => {
@@ -281,18 +320,17 @@ function ProjectList() {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('project.trackingCode')}</Form.Label>
-              <Form.Select
-                value={formData.tracking_code_id}
-                onChange={(e) => setFormData({ ...formData, tracking_code_id: e.target.value })}
-                required
-              >
-                <option value="">{t('common.selectCode') || 'Select a code'}</option>
-                {trackingCodes.map((tc) => (
-                  <option key={tc.id} value={tc.id}>
-                    {tc.code}
-                  </option>
-                ))}
-              </Form.Select>
+              <Select
+                options={trackingCodes.map((tc) => ({ value: tc.id, label: tc.code }))}
+                value={formData.tracking_code_id ? { value: formData.tracking_code_id, label: trackingCodes.find(tc => tc.id === formData.tracking_code_id)?.code || '' } : null}
+                onChange={(opt) => setFormData({ ...formData, tracking_code_id: opt ? opt.value : '' })}
+                styles={customSelectStyles}
+                classNamePrefix="rs"
+                className="rs-select"
+                isSearchable
+                isClearable
+                placeholder={t('common.selectCode') || 'Select a code'}
+              />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('project.color')}</Form.Label>
@@ -316,15 +354,20 @@ function ProjectList() {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('project.pattern')}</Form.Label>
-              <Form.Select
-                value={formData.pattern}
-                onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
-                required
-              >
-                <option value="solid">{t('project.patterns.solid')}</option>
-                <option value="striped">{t('project.patterns.striped')}</option>
-                <option value="dotted">{t('project.patterns.dotted')}</option>
-              </Form.Select>
+              <Select
+                options={[
+                  { value: 'solid', label: t('project.patterns.solid') },
+                  { value: 'striped', label: t('project.patterns.striped') },
+                  { value: 'dotted', label: t('project.patterns.dotted') },
+                ]}
+                value={{ value: formData.pattern, label: t(`project.patterns.${formData.pattern}`) }}
+                onChange={(opt) => setFormData({ ...formData, pattern: opt.value })}
+                styles={customSelectStyles}
+                classNamePrefix="rs"
+                className="rs-select"
+                isSearchable
+                isClearable={false}
+              />
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Row, Col, Card, Form, Button, Spinner, Alert, Badge, Table,
 } from 'react-bootstrap';
+import Select from 'react-select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -202,6 +203,44 @@ export default function Stats() {
     return `${t('common.year')} ${a}`;
   }, [stats, t, monthLabels]);
 
+  // ── Custom select styles for react-select
+  const customSelectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-bg)',
+      borderColor: state.isFocused ? 'var(--rs-focus-border)' : 'var(--rs-border)',
+      boxShadow: state.isFocused ? '0 0 0 0.25rem var(--rs-focus-shadow)' : 'none',
+      '&:hover': {
+        borderColor: 'var(--rs-focus-border)',
+      },
+      minHeight: '38px',
+      fontSize: '14px',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: 'var(--rs-menu-bg)',
+      zIndex: 999999,
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? 'var(--rs-option-selected)'
+        : state.isFocused
+        ? 'var(--rs-option-focused)'
+        : 'var(--rs-menu-bg)',
+      color: state.isSelected ? '#fff' : 'var(--rs-option-color)',
+      cursor: 'pointer',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
+    input: (provided) => ({
+      ...provided,
+      color: 'var(--rs-text)',
+    }),
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
@@ -221,9 +260,9 @@ export default function Stats() {
       </div>
 
       {/* ── Filters ── */}
-      <Card className="mb-4">
-        <Card.Body>
-          <Row className="g-3 align-items-end">
+      <Card className="mb-4" style={{ overflow: 'visible' }}>
+        <Card.Body style={{ overflow: 'visible' }}>
+          <Row className="g-3 align-items-end" style={{ overflow: 'visible' }}>
             {/* Granularité */}
             <Col xs={12} sm={6} md={3}>
               <Form.Label className="fw-semibold mb-1">{t('stats.granularity')}</Form.Label>
@@ -246,20 +285,34 @@ export default function Stats() {
             {/* Année */}
             <Col xs={6} sm={4} md={2}>
               <Form.Label className="fw-semibold mb-1">{t('stats.year')}</Form.Label>
-              <Form.Select size="sm" value={year} onChange={e => setYear(Number(e.target.value))}>
-                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-              </Form.Select>
+              <Select
+                options={yearOptions.map(y => ({ value: y, label: y.toString() }))}
+                value={{ value: year, label: year.toString() }}
+                onChange={(opt) => setYear(opt.value)}
+                styles={customSelectStyles}
+                classNamePrefix="rs"
+                className="rs-select"
+                isSearchable
+                isClearable={false}
+                menuPortalTarget={document.body}
+              />
             </Col>
 
             {/* Mois (if granularite = mois) */}
 {granularity === 'month' && (
               <Col xs={6} sm={4} md={3}>
                 <Form.Label className="fw-semibold mb-1">{t('stats.month')}</Form.Label>
-                <Form.Select size="sm" value={month} onChange={e => setMonth(Number(e.target.value))}>
-                  {monthLabels.map((name, i) => (
-                    <option key={i + 1} value={i + 1}>{name}</option>
-                  ))}
-                </Form.Select>
+                <Select
+                  options={monthLabels.map((name, i) => ({ value: i + 1, label: name }))}
+                  value={{ value: month, label: monthLabels[month - 1] }}
+                  onChange={(opt) => setMonth(opt.value)}
+                  styles={customSelectStyles}
+                  classNamePrefix="rs"
+                  className="rs-select"
+                  isSearchable
+                  isClearable={false}
+                  menuPortalTarget={document.body}
+                />
               </Col>
             )}
 
@@ -267,23 +320,37 @@ export default function Stats() {
 {granularity === 'week' && (
               <Col xs={6} sm={4} md={2}>
                 <Form.Label className="fw-semibold mb-1">{t('stats.week')}</Form.Label>
-                <Form.Select size="sm" value={week} onChange={e => setWeek(Number(e.target.value))}>
-                  {Array.from({ length: maxWeeks }, (_, i) => i + 1).map(w => (
-                    <option key={w} value={w}>W{w}</option>
-                  ))}
-                </Form.Select>
+                <Select
+                  options={Array.from({ length: maxWeeks }, (_, i) => i + 1).map(w => ({ value: w, label: `W${w}` }))}
+                  value={{ value: week, label: `W${week}` }}
+                  onChange={(opt) => setWeek(opt.value)}
+                  styles={customSelectStyles}
+                  classNamePrefix="rs"
+                  className="rs-select"
+                  isSearchable
+                  isClearable={false}
+                  menuPortalTarget={document.body}
+                />
               </Col>
             )}
 
             {/* Utilisateur */}
             <Col xs={12} sm={6} md={3}>
               <Form.Label className="fw-semibold mb-1">{t('stats.user')}</Form.Label>
-              <Form.Select size="sm" value={userId} onChange={e => setUserId(e.target.value)}>
-                <option value="">{t('stats.allUsers')}</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </Form.Select>
+              <Select
+                options={[
+                  { value: '', label: t('stats.allUsers') },
+                  ...users.map(u => ({ value: u.id, label: u.name }))
+                ]}
+                value={userId === '' ? { value: '', label: t('stats.allUsers') } : { value: userId, label: users.find(u => u.id === userId)?.name || '' }}
+                onChange={(opt) => setUserId(opt.value)}
+                styles={customSelectStyles}
+                classNamePrefix="rs"
+                className="rs-select"
+                isSearchable
+                isClearable={false}
+                menuPortalTarget={document.body}
+              />
             </Col>
           </Row>
         </Card.Body>
