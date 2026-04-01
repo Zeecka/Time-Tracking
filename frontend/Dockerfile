@@ -24,6 +24,10 @@ COPY . .
 ARG REACT_APP_API_URL=/api/v1
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
+# Optional override of the JS export template
+ARG REACT_APP_EXPORT_JS_TEMPLATE
+ENV REACT_APP_EXPORT_JS_TEMPLATE=$REACT_APP_EXPORT_JS_TEMPLATE
+
 RUN npm run build
 
 # ── Stage 3: nginx static server ─────────────────────────────────────────────

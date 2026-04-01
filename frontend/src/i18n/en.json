@@ -302,6 +302,14 @@
     "breakdownByProject": "Breakdown by project",
     "entriesLabel": "Entries",
     "sheetTimeEntries": "Time Entries",
-    "sheetStats": "Stats"
+    "sheetStats": "Stats",
+    "jsExport": "Download as JS",
+    "jsGenerating": "Generating...",
+    "jsTemplateTitle": "JS Code Template",
+    "jsTemplateHelp": "Function body receiving timeEntries (array), activeColumns (array of {id, label, getValue}), filters ({start_year, start_week_number, end_year, end_week_number}), t (i18n). Must return a string.",
+    "jsTemplateReset": "Reset to default",
+    "jsTemplateEmpty": "Template is empty. Write a function body that returns a JS string.",
+    "jsTemplateMustReturnString": "Template must return a string.",
+    "jsTemplateError": "Template execution error: {{message}}"
   }
 }

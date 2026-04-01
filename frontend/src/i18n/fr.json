@@ -302,6 +302,14 @@
     "breakdownByProject": "Répartition par projet",
     "entriesLabel": "Entrées",
     "sheetTimeEntries": "Pointages",
-    "sheetStats": "Statistiques"
+    "sheetStats": "Statistiques",
+    "jsExport": "Télécharger en JS",
+    "jsGenerating": "Génération...",
+    "jsTemplateTitle": "Modèle de code JS",
+    "jsTemplateHelp": "Corps de fonction recevant timeEntries (tableau), activeColumns (tableau de {id, label, getValue}), filters ({start_year, start_week_number, end_year, end_week_number}), t (i18n). Doit retourner une chaîne.",
+    "jsTemplateReset": "Réinitialiser",
+    "jsTemplateEmpty": "Le modèle est vide. Écrivez un corps de fonction retournant une chaîne JS.",
+    "jsTemplateMustReturnString": "Le modèle doit retourner une chaîne.",
+    "jsTemplateError": "Erreur d'exécution du modèle : {{message}}"
   }
 }
