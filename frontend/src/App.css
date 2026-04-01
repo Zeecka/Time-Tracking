@@ -160,6 +160,12 @@ body {
   gap: 0.35rem;
 }
 
+.app-nav-links .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .app-nav-link {
   position: relative;
   display: inline-flex !important;
