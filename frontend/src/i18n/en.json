@@ -7,7 +7,7 @@
   "nav": {
     "stats": "Statistics",
     "projects": "Projects",
-    "trackingCodes": "Tracking Codes",
+    "trackingCodes": "Tracking\u00A0Codes",
     "users": "Users",
     "export": "Export",
     "selectLanguage": "Select language",
@@ -167,7 +167,7 @@
     "exportCsvSuccess": "CSV export done."
   },
   "timeEntry": {
-    "title": "Time Entries",
+    "title": "Time\u00A0Entries",
     "new": "New Time Entry",
     "edit": "Edit Time Entry",
     "startDate": "Start Date",

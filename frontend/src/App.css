@@ -176,6 +176,11 @@ body {
   color: var(--glass-text) !important;
   font-weight: 600;
   transition: all 0.24s ease;
+  white-space: nowrap;
+}
+
+.app-nav-link span {
+  white-space: nowrap;
 }
 
 .app-nav-link:hover,
