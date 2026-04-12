@@ -35,6 +35,11 @@ def create_app(config_name=None):
     app.register_blueprint(time_entry_bp, url_prefix="/api/v1/time-entry")
     app.register_blueprint(stats_bp, url_prefix="/api/v1/stats")
 
+    # JWT authentication middleware (no-op when OIDC_ISSUER is not configured)
+    from app.auth import validate_token
+
+    app.before_request(validate_token)
+
     with app.app_context():
         try:
             from app import models as _models  # noqa: F401

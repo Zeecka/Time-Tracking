@@ -10,6 +10,7 @@ import {
 } from 'react-router-dom';
 import { Navbar, Nav, Container, Button, Form } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from 'react-oidc-context';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -21,6 +22,8 @@ import TimeEntryGrid from './components/TimeEntryGrid';
 import Home from './components/Home';
 import ExportExcel from './components/ExportExcel';
 import Stats from './components/Stats';
+import { isOidcEnabled } from './auth';
+import api from './services/api';
 
 const THEME_STORAGE_KEY = 'record-theme';
 const LANGUAGE_STORAGE_KEY = 'record-language';
@@ -33,6 +36,125 @@ const PRIMARY_NAV_ITEMS = [
   { to: '/users', labelKey: 'nav.users', icon: 'users' },
   { to: '/export', labelKey: 'nav.export', icon: 'file-export' },
 ];
+
+// ---------------------------------------------------------------------------
+// OIDC auth components (only rendered when isOidcEnabled === true)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sets up an Axios request interceptor that attaches the current user's
+ * Bearer token to every outgoing API call.  Only mounted when OIDC is on.
+ */
+function OidcInterceptor({ children }) {
+  const auth = useAuth();
+  useEffect(() => {
+    const id = api.interceptors.request.use((config) => {
+      const token = auth.user?.access_token;
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+    return () => api.interceptors.request.eject(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.user]);
+
+  return children;
+}
+
+/**
+ * Blocks access to the application while the user is unauthenticated.
+ * Shows a centered login screen and redirects to the OIDC provider on click.
+ * Only mounted when OIDC is on.
+ */
+function OidcAuthGuard({ t, theme, children }) {
+  const auth = useAuth();
+
+  if (auth.isLoading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="text-center">
+          <div className="spinner-border mb-3" role="status" aria-hidden="true" />
+          <p className="text-muted">{t('auth.loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (auth.error) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-danger fa-3x mb-3" />
+          <h5 className="text-danger">{t('auth.error')}</h5>
+          <p className="text-muted">{auth.error.message}</p>
+          <Button variant="primary" onClick={() => auth.signinRedirect()}>
+            {t('auth.retry')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auth.isAuthenticated) {
+    return (
+      <div
+        className="d-flex justify-content-center align-items-center vh-100"
+        data-bs-theme={theme}
+      >
+        <div className="text-center p-4">
+          <span className="app-brand-mark mb-3 d-block" style={{ fontSize: '3rem' }}>
+            <i className="fas fa-stopwatch" />
+          </span>
+          <h2 className="mb-1">{t('app.brand')}</h2>
+          <p className="text-muted mb-4">{t('app.description')}</p>
+          <Button variant="primary" size="lg" onClick={() => auth.signinRedirect()}>
+            <i className="fas fa-sign-in-alt me-2" />
+            {t('auth.signIn')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <OidcInterceptor>
+      {children}
+    </OidcInterceptor>
+  );
+}
+
+/**
+ * Displays the authenticated user's name/email in the navbar and provides a
+ * sign-out button.  Only rendered when OIDC is on.
+ */
+function OidcUserChip({ t }) {
+  const auth = useAuth();
+  if (!auth.isAuthenticated) return null;
+  const displayName =
+    auth.user?.profile?.name ||
+    auth.user?.profile?.email ||
+    auth.user?.profile?.sub ||
+    '';
+  return (
+    <div className="app-toolbar-chip">
+      <i className="fas fa-user-circle me-1" />
+      <span className="app-toolbar-label me-2" title={displayName}>
+        {displayName}
+      </span>
+      <Button
+        variant="link"
+        size="sm"
+        className="p-0 text-danger"
+        title={t('auth.signOut')}
+        onClick={() => auth.signoutRedirect()}
+      >
+        <i className="fas fa-sign-out-alt" />
+      </Button>
+    </div>
+  );
+}
 const normalizeLanguage = (value) => {
   if (typeof value !== 'string') {
     return 'en';
@@ -50,6 +172,29 @@ const getInitialTheme = () => {
 
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
+
+/** The application routes, shared between the OIDC and non-OIDC render paths. */
+function AppRoutes({ isTimeEntryPage }) {
+  return (
+    <Container className="app-shell">
+      <main className={`app-main-container${isTimeEntryPage ? '' : ' app-content-panel'}`}>
+        <Routes>
+          <Route path="/" element={<TimeEntryGrid viewMode="gantt" />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/time-entries" element={<Navigate to="/time-entries/gantt" replace />} />
+          <Route path="/time-entries/table" element={<TimeEntryGrid viewMode="table" />} />
+          <Route path="/time-entries/gantt" element={<TimeEntryGrid viewMode="gantt" />} />
+          <Route path="/time-entries/synthesis" element={<TimeEntryGrid viewMode="synthesis" />} />
+          <Route path="/projects" element={<ProjectList />} />
+          <Route path="/tracking-codes" element={<TrackingCodeList />} />
+          <Route path="/users" element={<UserList />} />
+          <Route path="/export" element={<ExportExcel />} />
+        </Routes>
+      </main>
+    </Container>
+  );
+}
 
 function AppLayout({
   theme,
@@ -128,29 +273,20 @@ function AppLayout({
                     className="app-theme-switch"
                   />
                 </div>
+                {isOidcEnabled && <OidcUserChip t={t} />}
               </div>
             </Nav>
           </Navbar.Collapse>
         </Container>
       </Navbar>
 
-      <Container className="app-shell">
-        <main className={`app-main-container${isTimeEntryPage ? '' : ' app-content-panel'}`}>
-          <Routes>
-            <Route path="/" element={<TimeEntryGrid viewMode="gantt" />} />
-            <Route path="/stats" element={<Stats />} />
-            <Route path="/home" element={<Home />} />
-            <Route path="/time-entries" element={<Navigate to="/time-entries/gantt" replace />} />
-            <Route path="/time-entries/table" element={<TimeEntryGrid viewMode="table" />} />
-            <Route path="/time-entries/gantt" element={<TimeEntryGrid viewMode="gantt" />} />
-            <Route path="/time-entries/synthesis" element={<TimeEntryGrid viewMode="synthesis" />} />
-            <Route path="/projects" element={<ProjectList />} />
-            <Route path="/tracking-codes" element={<TrackingCodeList />} />
-            <Route path="/users" element={<UserList />} />
-            <Route path="/export" element={<ExportExcel />} />
-          </Routes>
-        </main>
-      </Container>
+      {isOidcEnabled ? (
+        <OidcAuthGuard t={t} theme={theme}>
+          <AppRoutes isTimeEntryPage={isTimeEntryPage} />
+        </OidcAuthGuard>
+      ) : (
+        <AppRoutes isTimeEntryPage={isTimeEntryPage} />
+      )}
     </div>
   );
 }

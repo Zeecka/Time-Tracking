@@ -39,6 +39,12 @@ class Config:
     STATS_EXCLUDE_CODES_STR = os.environ.get("STATS_EXCLUDE_CODES", "")
     STATS_EXCLUDE_CODES = _parse_csv_codes_env(STATS_EXCLUDE_CODES_STR)
 
+    # OIDC / OAuth2 configuration (optional).
+    # When OIDC_ISSUER is set every /api/* request must carry a valid Bearer token.
+    # Leave empty (the default) to run without authentication.
+    OIDC_ISSUER = os.environ.get("OIDC_ISSUER") or None
+    OIDC_AUDIENCE = os.environ.get("OIDC_AUDIENCE") or None
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""
