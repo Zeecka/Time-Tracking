@@ -41,6 +41,10 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: /api/v1
+        REACT_APP_OIDC_AUTHORITY: ${REACT_APP_OIDC_AUTHORITY:-}
+        REACT_APP_OIDC_CLIENT_ID: ${REACT_APP_OIDC_CLIENT_ID:-}
+        REACT_APP_OIDC_REDIRECT_URI: ${REACT_APP_OIDC_REDIRECT_URI:-}
+        REACT_APP_OIDC_SCOPE: ${REACT_APP_OIDC_SCOPE:-}
     container_name: record_frontend
     restart: unless-stopped
     env_file:

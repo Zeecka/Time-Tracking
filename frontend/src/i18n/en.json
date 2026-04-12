@@ -276,6 +276,13 @@
     "presenceLevelAverage": "Average",
     "presenceLevelLow": "Low presence"
   },
+  "auth": {
+    "loading": "Checking authentication...",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "error": "Authentication error",
+    "retry": "Try again"
+  },
   "export": {
     "title": "Export",
     "selectWeek": "Select a week",

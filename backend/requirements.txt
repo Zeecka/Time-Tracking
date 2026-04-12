@@ -10,3 +10,6 @@ PyMySQL==1.1.1
 python-dotenv==1.0.1
 cryptography==42.0.8
 gunicorn==22.0.0
+
+PyJWT[crypto]>=2.12.0
+requests>=2.32.0
